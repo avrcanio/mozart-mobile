@@ -5,6 +5,7 @@ import '../../data/purchase_orders/purchase_order_repository.dart';
 import '../../domain/purchase_order.dart';
 import '../../domain/user_session.dart';
 import '../purchase_order_detail_controller.dart';
+import 'purchase_order_form_screen.dart';
 
 class PurchaseOrderDetailScreen extends StatelessWidget {
   const PurchaseOrderDetailScreen({
@@ -29,11 +30,11 @@ class PurchaseOrderDetailScreen extends StatelessWidget {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: PurchaseOrderDetailPane(
-            orderId: orderId,
-            session: session,
-            repository: repository,
-            onOrderChanged: onOrderChanged,
+            child: PurchaseOrderDetailPane(
+              orderId: orderId,
+              session: session,
+              repository: repository,
+              onOrderChanged: onOrderChanged,
           ),
         ),
       ),
@@ -99,6 +100,24 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
     }
   }
 
+  Future<void> _openEdit(PurchaseOrder order) async {
+    final updated = await Navigator.of(context).push<PurchaseOrder>(
+      MaterialPageRoute<PurchaseOrder>(
+        builder: (context) => PurchaseOrderFormScreen(
+          session: widget.session,
+          repository: widget.repository,
+          initialOrder: order,
+          onSaved: widget.onOrderChanged == null
+              ? null
+              : (_) => widget.onOrderChanged!(),
+        ),
+      ),
+    );
+    if (updated != null) {
+      _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<PurchaseOrderDetailState>(
@@ -119,6 +138,7 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
               state: state,
               onRetry: _load,
               onSend: _send,
+              onEdit: _openEdit,
             ),
           ),
         ],
@@ -132,11 +152,13 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
     required this.state,
     required this.onRetry,
     required this.onSend,
+    required this.onEdit,
   });
 
   final PurchaseOrderDetailState state;
   final VoidCallback onRetry;
   final Future<void> Function() onSend;
+  final Future<void> Function(PurchaseOrder order) onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -220,18 +242,37 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
         if (order.canSend)
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
+            child: Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: state.isSending ? null : onSend,
+                  icon: state.isSending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send),
+                  label: Text(state.isSending ? 'Slanje...' : 'Posalji narudzbu'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => onEdit(order),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Uredi'),
+                ),
+              ],
+            ),
+          ),
+        if (!order.canSend)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                onPressed: state.isSending ? null : onSend,
-                icon: state.isSending
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send),
-                label: Text(state.isSending ? 'Slanje...' : 'Posalji narudzbu'),
+              child: OutlinedButton.icon(
+                onPressed: () => onEdit(order),
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Uredi'),
               ),
             ),
           ),

@@ -571,6 +571,136 @@ void main() {
     expect(find.text('Posalji narudzbu'), findsNothing);
     expect(find.text('Poslana'), findsWidgets);
   });
+
+  test('creates purchase order with expected payload mapping', () async {
+    ApiRequest? capturedRequest;
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'POST /api/purchase-orders/': (ApiRequest request) {
+            capturedRequest = request;
+            return _jsonResponse(<String, dynamic>{
+              'id': 91,
+              'reference': 'PO-NEW',
+              'supplier': 2,
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type': 5,
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-05T09:30:00Z',
+              'total_gross': '120.00',
+              'items': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 1,
+                  'artikl': 77,
+                  'artikl_name': 'Coffee beans',
+                  'quantity': '3.0000',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kg',
+                  'price': '12.50',
+                  'received_quantity': '0.0000',
+                  'remaining_quantity': '3.0000',
+                  'base_group': '',
+                },
+              ],
+            });
+          },
+        }),
+      ),
+    );
+
+    await repository.createPurchaseOrder(
+      authToken: 'saved-token',
+      payload: <String, dynamic>{
+        'supplier': 2,
+        'payment_type': 5,
+        'ordered_at': '2026-04-05T09:30:00Z',
+        'status': 'created',
+        'items': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'artikl': 77,
+            'quantity': '3',
+            'unit_of_measure': 1,
+            'price': '12.50',
+          },
+        ],
+      },
+    );
+
+    final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+    expect(body['supplier'], 2);
+    expect(body['payment_type'], 5);
+    expect(body['status'], 'created');
+    expect((body['items'] as List).single['artikl'], 77);
+    expect((body['items'] as List).single['unit_of_measure'], 1);
+  });
+
+  test('updates purchase order with expected payload mapping', () async {
+    ApiRequest? capturedRequest;
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'PUT /api/purchase-orders/44/': (ApiRequest request) {
+            capturedRequest = request;
+            return _jsonResponse(<String, dynamic>{
+              'id': 44,
+              'reference': 'PO-EDIT',
+              'supplier': 2,
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type': 6,
+              'payment_type_name': 'Karticno',
+              'ordered_at': '2026-04-05T09:30:00Z',
+              'total_gross': '130.00',
+              'items': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 7,
+                  'artikl': 77,
+                  'artikl_name': 'Coffee beans',
+                  'quantity': '4.0000',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kg',
+                  'price': '13.00',
+                  'received_quantity': '0.0000',
+                  'remaining_quantity': '4.0000',
+                  'base_group': '',
+                },
+              ],
+            });
+          },
+        }),
+      ),
+    );
+
+    await repository.updatePurchaseOrder(
+      orderId: 44,
+      authToken: 'saved-token',
+      payload: <String, dynamic>{
+        'supplier': 2,
+        'payment_type': 6,
+        'ordered_at': '2026-04-05T09:30:00Z',
+        'status': 'created',
+        'items': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 7,
+            'artikl': 77,
+            'quantity': '4',
+            'unit_of_measure': 1,
+            'price': '13.00',
+          },
+        ],
+      },
+    );
+
+    final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+    expect(body['payment_type'], 6);
+    expect((body['items'] as List).single['id'], 7);
+    expect((body['items'] as List).single['price'], '13.00');
+  });
 }
 
 Future<_Harness> _createHarness({
@@ -675,6 +805,8 @@ class _FakeTransport implements ApiTransport {
       response = candidate;
     } else if (candidate is List<_FakeResponse> && candidate.isNotEmpty) {
       response = candidate.removeAt(0);
+    } else if (candidate is _FakeResponse Function(ApiRequest)) {
+      response = candidate(request);
     } else {
       throw StateError('Invalid fake response for $key');
     }

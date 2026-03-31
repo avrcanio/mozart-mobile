@@ -4,9 +4,11 @@ class PurchaseOrderDto {
   const PurchaseOrderDto({
     required this.id,
     required this.reference,
+    required this.supplierId,
     required this.status,
     required this.statusLabel,
     required this.supplierName,
+    required this.paymentTypeId,
     required this.paymentTypeName,
     required this.totalAmount,
     required this.currency,
@@ -16,9 +18,11 @@ class PurchaseOrderDto {
 
   final int id;
   final String reference;
+  final int supplierId;
   final String status;
   final String statusLabel;
   final String supplierName;
+  final int? paymentTypeId;
   final String paymentTypeName;
   final double totalAmount;
   final String currency;
@@ -42,6 +46,11 @@ class PurchaseOrderDto {
               json['id'] ??
               '')
           .toString(),
+      supplierId: _asInt(
+        json['supplier'] is Map<String, dynamic>
+            ? json['supplier']['id'] ?? json['supplier']['rm_id']
+            : json['supplier'],
+      ),
       status: (json['status'] ?? 'unknown').toString(),
       statusLabel: _asLabel(
         json['status_display'],
@@ -54,6 +63,11 @@ class PurchaseOrderDto {
               '')
           .toString()
           .trim(),
+      paymentTypeId: _asNullableInt(
+        json['payment_type'] is Map<String, dynamic>
+            ? json['payment_type']['id']
+            : json['payment_type'],
+      ),
       paymentTypeName: (json['payment_type_name'] ??
               json['payment_type']?['name'] ??
               json['payment_type'] ??
@@ -77,9 +91,11 @@ class PurchaseOrderDto {
     return PurchaseOrder(
       id: id,
       reference: reference,
+      supplierId: supplierId,
       status: status,
       statusLabel: statusLabel,
       supplierName: supplierName.isEmpty ? 'Nepoznati dobavljac' : supplierName,
+      paymentTypeId: paymentTypeId,
       paymentTypeName:
           paymentTypeName.isEmpty ? 'Nije definirano' : paymentTypeName,
       totalAmount: totalAmount,
@@ -94,6 +110,16 @@ class PurchaseOrderDto {
       return value;
     }
     return int.tryParse(value.toString()) ?? 0;
+  }
+
+  static int? _asNullableInt(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is int) {
+      return value;
+    }
+    return int.tryParse(value.toString());
   }
 
   static double _asDouble(dynamic value) {
@@ -130,7 +156,11 @@ class PurchaseOrderDto {
 class PurchaseOrderLineDto {
   const PurchaseOrderLineDto({
     required this.id,
+    required this.articleId,
     required this.articleName,
+    required this.unitOfMeasureId,
+    required this.unitName,
+    required this.baseGroup,
     required this.quantity,
     required this.receivedQuantity,
     required this.remainingQuantity,
@@ -138,7 +168,11 @@ class PurchaseOrderLineDto {
   });
 
   final int id;
+  final int articleId;
   final String articleName;
+  final int unitOfMeasureId;
+  final String unitName;
+  final String baseGroup;
   final double quantity;
   final double receivedQuantity;
   final double remainingQuantity;
@@ -147,11 +181,26 @@ class PurchaseOrderLineDto {
   factory PurchaseOrderLineDto.fromJson(Map<String, dynamic> json) {
     return PurchaseOrderLineDto(
       id: PurchaseOrderDto._asInt(json['id']),
+      articleId: PurchaseOrderDto._asInt(
+        json['artikl'] ?? json['article_id'] ?? json['artikl_id'],
+      ),
       articleName: (json['article_name'] ??
               json['artikl_name'] ??
               json['item_name'] ??
               '')
           .toString(),
+      unitOfMeasureId: PurchaseOrderDto._asInt(
+        json['unit_of_measure'] ??
+            json['unit']?['rm_id'] ??
+            json['unit']?['id'] ??
+            json['unit_id'],
+      ),
+      unitName: (json['unit_name'] ??
+              json['unit']?['name'] ??
+              json['unit_of_measure_name'] ??
+              '')
+          .toString(),
+      baseGroup: (json['base_group'] ?? '').toString(),
       quantity: PurchaseOrderDto._asDouble(json['quantity']),
       receivedQuantity: PurchaseOrderDto._asDouble(
         json['received_quantity'] ?? json['received_qty'],
@@ -168,7 +217,11 @@ class PurchaseOrderLineDto {
   PurchaseOrderLine toDomain() {
     return PurchaseOrderLine(
       id: id,
+      articleId: articleId,
       articleName: articleName,
+      unitOfMeasureId: unitOfMeasureId,
+      unitName: unitName,
+      baseGroup: baseGroup,
       quantity: quantity,
       receivedQuantity: receivedQuantity,
       remainingQuantity: remainingQuantity,

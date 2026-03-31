@@ -3,6 +3,7 @@ import '../../domain/purchase_order_filters.dart';
 import '../http/api_client.dart';
 import 'models/payment_type_dto.dart';
 import 'models/purchase_order_dto.dart';
+import 'models/supplier_article_dto.dart';
 import 'models/supplier_dto.dart';
 
 class PurchaseOrderRepository {
@@ -117,5 +118,44 @@ class PurchaseOrderRepository {
       authToken: authToken,
       body: const <String, dynamic>{},
     );
+  }
+
+  Future<List<SupplierArticleDto>> fetchSupplierArticles({
+    required int supplierId,
+    required String authToken,
+  }) async {
+    final jsonList = await _apiClient.getJsonList(
+      '/api/suppliers/$supplierId/artikli/',
+      authToken: authToken,
+    );
+    return jsonList
+        .whereType<Map<String, dynamic>>()
+        .map(SupplierArticleDto.fromJson)
+        .toList();
+  }
+
+  Future<PurchaseOrder> createPurchaseOrder({
+    required Map<String, dynamic> payload,
+    required String authToken,
+  }) async {
+    final json = await _apiClient.postJson(
+      '/api/purchase-orders/',
+      authToken: authToken,
+      body: payload,
+    );
+    return PurchaseOrderDto.fromJson(json).toDomain();
+  }
+
+  Future<PurchaseOrder> updatePurchaseOrder({
+    required int orderId,
+    required Map<String, dynamic> payload,
+    required String authToken,
+  }) async {
+    final json = await _apiClient.putJson(
+      '/api/purchase-orders/$orderId/',
+      authToken: authToken,
+      body: payload,
+    );
+    return PurchaseOrderDto.fromJson(json).toDomain();
   }
 }

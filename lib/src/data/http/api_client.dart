@@ -89,6 +89,22 @@ class ApiClient {
     return _decodeMap(response);
   }
 
+  Future<JsonMap> putJson(
+    String path, {
+    required JsonMap body,
+    String? authToken,
+  }) async {
+    final response = await _send(
+      ApiRequest(
+        method: 'PUT',
+        uri: _endpoint(path),
+        headers: _headers(authToken: authToken),
+        body: jsonEncode(body),
+      ),
+    );
+    return _decodeMap(response);
+  }
+
   Uri endpoint(String path, {Map<String, String>? queryParameters}) =>
       _endpoint(path, queryParameters: queryParameters);
 
@@ -167,6 +183,19 @@ class ApiClient {
         final nonFieldErrors = decoded['non_field_errors'];
         if (nonFieldErrors is List && nonFieldErrors.isNotEmpty) {
           return nonFieldErrors.first.toString();
+        }
+        final fieldMessages = <String>[];
+        decoded.forEach((key, value) {
+          if (value is List && value.isNotEmpty) {
+            fieldMessages.add('$key: ${value.first}');
+            return;
+          }
+          if (value is String && value.isNotEmpty) {
+            fieldMessages.add('$key: $value');
+          }
+        });
+        if (fieldMessages.isNotEmpty) {
+          return fieldMessages.join('\n');
         }
       }
     } catch (_) {

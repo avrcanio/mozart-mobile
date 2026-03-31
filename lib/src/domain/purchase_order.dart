@@ -2,9 +2,11 @@ class PurchaseOrder {
   const PurchaseOrder({
     required this.id,
     required this.reference,
+    required this.supplierId,
     required this.status,
     required this.statusLabel,
     required this.supplierName,
+    required this.paymentTypeId,
     required this.paymentTypeName,
     required this.totalAmount,
     required this.currency,
@@ -14,9 +16,11 @@ class PurchaseOrder {
 
   final int id;
   final String reference;
+  final int supplierId;
   final String status;
   final String statusLabel;
   final String supplierName;
+  final int? paymentTypeId;
   final String paymentTypeName;
   final double totalAmount;
   final String currency;
@@ -35,7 +39,11 @@ class PurchaseOrder {
 class PurchaseOrderLine {
   const PurchaseOrderLine({
     required this.id,
+    required this.articleId,
     required this.articleName,
+    required this.unitOfMeasureId,
+    required this.unitName,
+    required this.baseGroup,
     required this.quantity,
     required this.receivedQuantity,
     required this.remainingQuantity,
@@ -43,7 +51,11 @@ class PurchaseOrderLine {
   });
 
   final int id;
+  final int articleId;
   final String articleName;
+  final int unitOfMeasureId;
+  final String unitName;
+  final String baseGroup;
   final double quantity;
   final double receivedQuantity;
   final double remainingQuantity;

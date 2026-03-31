@@ -15,6 +15,7 @@ import '../purchase_orders_controller.dart';
 import '../session_scope.dart';
 import 'mailbox_detail_screen.dart';
 import 'purchase_order_detail_screen.dart';
+import 'purchase_order_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -743,6 +744,25 @@ class _PurchaseOrdersTab extends StatelessWidget {
                 child: const Text('Reset'),
               ),
             ],
+            const Spacer(),
+            FilledButton.icon(
+              onPressed: () async {
+                final created = await Navigator.of(context).push<PurchaseOrder>(
+                  MaterialPageRoute<PurchaseOrder>(
+                    builder: (context) => PurchaseOrderFormScreen(
+                      session: session,
+                      repository: repository,
+                      onSaved: (_) => onOrderChanged(),
+                    ),
+                  ),
+                );
+                if (created != null) {
+                  onSelect(created.id);
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Nova'),
+            ),
           ],
         ),
         if (state.hasActiveFilters) ...[
