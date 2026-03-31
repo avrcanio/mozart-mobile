@@ -11,6 +11,7 @@ import '../dashboard_controller.dart';
 import '../mailbox_controller.dart';
 import '../purchase_orders_controller.dart';
 import '../session_scope.dart';
+import 'mailbox_detail_screen.dart';
 import 'purchase_order_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -123,6 +124,8 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, state, _) => _MailboxTab(
           state: state,
           onRetry: _loadAll,
+          repository: widget.mailboxRepository,
+          session: widget.session,
         ),
       ),
       ValueListenableBuilder<PurchaseOrdersState>(
@@ -506,10 +509,14 @@ class _MailboxTab extends StatelessWidget {
   const _MailboxTab({
     required this.state,
     required this.onRetry,
+    required this.repository,
+    required this.session,
   });
 
   final MailboxState state;
   final VoidCallback onRetry;
+  final MailboxRepository repository;
+  final UserSession session;
 
   @override
   Widget build(BuildContext context) {
@@ -583,6 +590,17 @@ class _MailboxTab extends StatelessWidget {
               trailing: message.hasAttachments
                   ? _MailboxAttachmentCount(count: message.attachmentCount)
                   : const SizedBox.shrink(),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => MailboxDetailScreen(
+                      messageId: message.id,
+                      session: session,
+                      repository: repository,
+                    ),
+                  ),
+                );
+              },
             ),
           );
         },

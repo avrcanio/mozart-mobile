@@ -129,6 +129,81 @@ void main() {
     expect(find.text('2'), findsOneWidget);
   });
 
+  testWidgets('opens mailbox detail view from mapped backend data', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, _FakeResponse>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 9,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mail',
+          'last_name': 'User',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 700,
+            'subject': 'Nova ponuda',
+            'from_email': 'nabava@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 1,
+          },
+        ]),
+        'GET /api/mailbox/messages/700/': _jsonResponse(<String, dynamic>{
+          'id': 700,
+          'subject': 'Nova ponuda',
+          'from_email': 'nabava@mozart.hr',
+          'to_emails': 'root@mozart.local',
+          'cc_emails': 'manager@mozart.local',
+          'sent_at': '2026-04-01T08:45:00Z',
+          'body_text': 'Detalji ponude za tjednu nabavu.',
+          'attachments': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 1,
+              'filename': 'ponuda.pdf',
+              'content_type': 'application/pdf',
+              'size': 2048,
+              'file_url': 'https://example.test/media/ponuda.pdf',
+            },
+          ],
+        }),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 88,
+            'reference': 'PO-88',
+            'supplier_name': 'Warehouse One',
+            'status': 'sent',
+            'status_display': 'Sent',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Mailbox'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Nova ponuda'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Message Detail'), findsOneWidget);
+    expect(find.text('Detalji ponude za tjednu nabavu.'), findsOneWidget);
+    expect(find.text('manager@mozart.local'), findsOneWidget);
+    expect(find.text('ponuda.pdf'), findsOneWidget);
+    expect(find.text('Kopiraj link'), findsOneWidget);
+  });
+
   testWidgets('renders purchase order list from mapped backend data', (
     tester,
   ) async {
