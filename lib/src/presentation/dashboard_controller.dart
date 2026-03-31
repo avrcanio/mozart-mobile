@@ -19,6 +19,8 @@ class DashboardState {
   final DashboardSummary? summary;
   final String? errorMessage;
 
+  bool get hasContent => summary != null;
+
   DashboardState copyWith({
     bool? isLoading,
     DashboardSummary? summary,
@@ -52,7 +54,8 @@ class DashboardController extends ValueNotifier<DashboardState> {
     } catch (error) {
       value = value.copyWith(
         isLoading: false,
-        errorMessage: error.toString(),
+        errorMessage:
+            'Dashboard trenutno nije dostupan. Pokusajte osvjeziti podatke.',
       );
     }
   }

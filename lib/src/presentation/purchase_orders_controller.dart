@@ -19,6 +19,8 @@ class PurchaseOrdersState {
   final List<PurchaseOrder> orders;
   final String? errorMessage;
 
+  bool get hasContent => orders.isNotEmpty;
+
   PurchaseOrdersState copyWith({
     bool? isLoading,
     List<PurchaseOrder>? orders,
@@ -52,7 +54,8 @@ class PurchaseOrdersController extends ValueNotifier<PurchaseOrdersState> {
     } catch (error) {
       value = value.copyWith(
         isLoading: false,
-        errorMessage: error.toString(),
+        errorMessage:
+            'Narudzbe trenutno nisu dostupne. Osvjezite prikaz i pokusajte ponovno.',
       );
     }
   }

@@ -93,16 +93,23 @@ class _HomeScreenState extends State<HomeScreen> {
     final tabs = <Widget>[
       ValueListenableBuilder<DashboardState>(
         valueListenable: _dashboardController,
-        builder: (context, state, _) => _DashboardTab(state: state),
+        builder: (context, state, _) => _DashboardTab(
+          state: state,
+          onRetry: _loadAll,
+        ),
       ),
       ValueListenableBuilder<MailboxState>(
         valueListenable: _mailboxController,
-        builder: (context, state, _) => _MailboxTab(state: state),
+        builder: (context, state, _) => _MailboxTab(
+          state: state,
+          onRetry: _loadAll,
+        ),
       ),
       ValueListenableBuilder<PurchaseOrdersState>(
         valueListenable: _purchaseOrdersController,
         builder: (context, state, _) => _PurchaseOrdersTab(
           state: state,
+          onRetry: _loadAll,
           selectedOrderId: _selectedOrderId,
           onSelect: (orderId) {
             setState(() {
@@ -254,9 +261,13 @@ class _ErrorBanner extends StatelessWidget {
 }
 
 class _DashboardTab extends StatelessWidget {
-  const _DashboardTab({required this.state});
+  const _DashboardTab({
+    required this.state,
+    required this.onRetry,
+  });
 
   final DashboardState state;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -311,6 +322,29 @@ class _DashboardTab extends StatelessWidget {
               padding: EdgeInsets.only(bottom: 12),
               child: LinearProgressIndicator(),
             ),
+          if (state.isLoading && !state.hasContent)
+            const _TabStateCard(
+              icon: Icons.hourglass_top_rounded,
+              title: 'Ucitavanje dashboarda',
+              message: 'Pripremamo najvaznije podatke za danasnji rad.',
+            )
+          else if (state.errorMessage != null && !state.hasContent)
+            _TabStateCard(
+              icon: Icons.wifi_off_rounded,
+              title: 'Dashboard nije dostupan',
+              message: state.errorMessage!,
+              actionLabel: 'Pokusaj ponovno',
+              onAction: onRetry,
+            )
+          else if (!state.hasContent)
+            _TabStateCard(
+              icon: Icons.dashboard_customize_outlined,
+              title: 'Nema podataka za prikaz',
+              message: 'Dashboard ce se pojaviti cim stignu novi podaci.',
+              actionLabel: 'Osvjezi',
+              onAction: onRetry,
+            )
+          else ...[
           Card(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
@@ -372,6 +406,7 @@ class _DashboardTab extends StatelessWidget {
               );
             },
           ),
+          ],
         ],
       ),
     );
@@ -437,9 +472,13 @@ class _DashboardMetricCard extends StatelessWidget {
 }
 
 class _MailboxTab extends StatelessWidget {
-  const _MailboxTab({required this.state});
+  const _MailboxTab({
+    required this.state,
+    required this.onRetry,
+  });
 
   final MailboxState state;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -448,7 +487,7 @@ class _MailboxTab extends StatelessWidget {
 
     return _PageFrame(
       child: ListView.separated(
-        itemCount: state.messages.length + 1,
+        itemCount: state.messages.isEmpty ? 2 : state.messages.length + 1,
         separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           if (index == 0) {
@@ -462,11 +501,40 @@ class _MailboxTab extends StatelessWidget {
                   style: theme.textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 16),
-                if (state.errorMessage != null)
+                if (state.errorMessage != null && state.hasContent)
                   _ErrorBanner(message: state.errorMessage!),
-                if (state.isLoading) const LinearProgressIndicator(),
-                if (state.isLoading) const SizedBox(height: 16),
+                if (state.isLoading && state.hasContent)
+                  const LinearProgressIndicator(),
+                if (state.isLoading && state.hasContent) const SizedBox(height: 16),
               ],
+            );
+          }
+
+          if (index == 1 && state.isLoading && !state.hasContent) {
+            return const _TabStateCard(
+              icon: Icons.mail_outline,
+              title: 'Ucitavanje poruka',
+              message: 'Dohvacamo najnovije poruke i priloge.',
+            );
+          }
+
+          if (index == 1 && state.errorMessage != null && !state.hasContent) {
+            return _TabStateCard(
+              icon: Icons.mark_email_unread_outlined,
+              title: 'Poruke nisu dostupne',
+              message: state.errorMessage!,
+              actionLabel: 'Pokusaj ponovno',
+              onAction: onRetry,
+            );
+          }
+
+          if (index == 1 && !state.hasContent) {
+            return _TabStateCard(
+              icon: Icons.inbox_outlined,
+              title: 'Nema poruka',
+              message: 'Trenutno nema novih poruka u sanducicu.',
+              actionLabel: 'Osvjezi',
+              onAction: onRetry,
             );
           }
 
@@ -531,11 +599,13 @@ class _MailboxAttachmentCount extends StatelessWidget {
 class _PurchaseOrdersTab extends StatelessWidget {
   const _PurchaseOrdersTab({
     required this.state,
+    required this.onRetry,
     required this.selectedOrderId,
     required this.onSelect,
   });
 
   final PurchaseOrdersState state;
+  final VoidCallback onRetry;
   final int? selectedOrderId;
   final ValueChanged<int> onSelect;
 
@@ -569,13 +639,37 @@ class _PurchaseOrdersTab extends StatelessWidget {
           style: theme.textTheme.bodyLarge,
         ),
         const SizedBox(height: 16),
-        if (state.errorMessage != null) _ErrorBanner(message: state.errorMessage!),
-        if (state.isLoading)
+        if (state.errorMessage != null && state.hasContent)
+          _ErrorBanner(message: state.errorMessage!),
+        if (state.isLoading && state.hasContent)
           const Padding(
             padding: EdgeInsets.only(bottom: 16),
             child: LinearProgressIndicator(),
           ),
-        ...state.orders.map(
+        if (state.isLoading && !state.hasContent)
+          const _TabStateCard(
+            icon: Icons.receipt_long_outlined,
+            title: 'Ucitavanje narudzbi',
+            message: 'Pripremamo pregled aktivnih narudzbi.',
+          )
+        else if (state.errorMessage != null && !state.hasContent)
+          _TabStateCard(
+            icon: Icons.receipt_long_outlined,
+            title: 'Narudzbe nisu dostupne',
+            message: state.errorMessage!,
+            actionLabel: 'Pokusaj ponovno',
+            onAction: onRetry,
+          )
+        else if (!state.hasContent)
+          _TabStateCard(
+            icon: Icons.playlist_add_check_circle_outlined,
+            title: 'Nema aktivnih narudzbi',
+            message: 'Kad stignu nove narudzbe, ovdje ce biti prikazane.',
+            actionLabel: 'Osvjezi',
+            onAction: onRetry,
+          )
+        else
+          ...state.orders.map(
           (order) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Card(
@@ -660,6 +754,63 @@ class _PurchaseOrdersTab extends StatelessWidget {
                 detail,
               ],
             ),
+    );
+  }
+}
+
+class _TabStateCard extends StatelessWidget {
+  const _TabStateCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(message, style: theme.textTheme.bodyLarge),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: onAction,
+                child: Text(actionLabel!),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

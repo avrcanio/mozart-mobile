@@ -19,6 +19,8 @@ class MailboxState {
   final List<MailMessage> messages;
   final String? errorMessage;
 
+  bool get hasContent => messages.isNotEmpty;
+
   MailboxState copyWith({
     bool? isLoading,
     List<MailMessage>? messages,
@@ -52,7 +54,8 @@ class MailboxController extends ValueNotifier<MailboxState> {
     } catch (error) {
       value = value.copyWith(
         isLoading: false,
-        errorMessage: error.toString(),
+        errorMessage:
+            'Poruke trenutno nisu dostupne. Pokusajte ponovno za nekoliko trenutaka.',
       );
     }
   }
