@@ -302,6 +302,26 @@ void main() {
     expect(find.text('Pokusaj ponovno'), findsOneWidget);
   });
 
+  testWidgets('returns to login and clears token when restored session is invalid', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'expired-token',
+      responses: <String, _FakeResponse>{
+        'GET /api/me/': _FakeResponse(
+          statusCode: 401,
+          body: jsonEncode(<String, dynamic>{'detail': 'Invalid token'}),
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(await harness.storage.readToken(), isNull);
+  });
+
   testWidgets('applies and resets purchase order filters on mobile', (
     tester,
   ) async {
@@ -400,6 +420,53 @@ void main() {
     expect(find.textContaining('PO-BASE'), findsOneWidget);
     expect(find.text('Status: Poslana'), findsNothing);
   });
+
+  testWidgets('logout removes persisted token', (tester) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, _FakeResponse>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 7,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mozart',
+          'last_name': 'Operator',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 101,
+            'subject': 'Daily digest',
+            'from_email': 'office@mozart.local',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T10:15:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 15,
+            'reference': 'PO-15',
+            'supplier_name': 'Adriatic Trade',
+            'status': 'draft',
+            'status_display': 'Draft',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '145.50',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Logout'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(await harness.storage.readToken(), isNull);
+  });
 }
 
 Future<_Harness> _createHarness({
@@ -444,7 +511,11 @@ Future<_Harness> _createHarness({
     ),
   );
 
-  return _Harness(app: app, controller: sessionController);
+  return _Harness(
+    app: app,
+    controller: sessionController,
+    storage: storage,
+  );
 }
 
 _FakeResponse _jsonResponse(Map<String, dynamic> json) {
@@ -462,10 +533,12 @@ class _Harness {
   const _Harness({
     required this.app,
     required this.controller,
+    required this.storage,
   });
 
   final Widget app;
   final SessionController controller;
+  final AuthStorage storage;
 }
 
 class _FakeResponse {

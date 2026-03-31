@@ -32,7 +32,7 @@ class _MozartMobileAppState extends State<MozartMobileApp> {
   void initState() {
     super.initState();
     _apiClient = ApiClient();
-    _authStorage = InMemoryAuthStorage();
+    _authStorage = SecureAuthStorage();
     _authRepository = AuthRepository(
       apiClient: _apiClient,
       storage: _authStorage,
