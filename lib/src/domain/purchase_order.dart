@@ -28,6 +28,8 @@ class PurchaseOrder {
 
   double get remainingQuantity =>
       lines.fold(0, (sum, line) => sum + line.remainingQuantity);
+
+  bool get canSend => status == 'created';
 }
 
 class PurchaseOrderLine {

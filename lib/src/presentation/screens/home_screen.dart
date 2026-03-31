@@ -100,6 +100,10 @@ class _HomeScreenState extends State<HomeScreen> {
     await _purchaseOrdersController.resetFilters(widget.session.token);
   }
 
+  Future<void> _refreshPurchaseOrders() async {
+    await _purchaseOrdersController.load(widget.session.token);
+  }
+
   void _syncSelectedOrder() {
     final orders = _purchaseOrdersController.value.orders;
     if (orders.isEmpty) {
@@ -163,6 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onRetry: _loadAll,
           onOpenFilters: () => _showPurchaseOrderFilters(state),
           onResetFilters: _resetPurchaseOrderFilters,
+          onOrderChanged: _refreshPurchaseOrders,
           repository: widget.purchaseOrderRepository,
           session: widget.session,
           selectedOrderId: _selectedOrderId,
@@ -681,6 +686,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
     required this.onRetry,
     required this.onOpenFilters,
     required this.onResetFilters,
+    required this.onOrderChanged,
     required this.repository,
     required this.session,
     required this.selectedOrderId,
@@ -692,6 +698,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback onOpenFilters;
   final VoidCallback onResetFilters;
+  final Future<void> Function() onOrderChanged;
   final PurchaseOrderRepository repository;
   final UserSession session;
   final int? selectedOrderId;
@@ -802,6 +809,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
                           orderId: order.id,
                           session: session,
                           repository: repository,
+                          onOrderChanged: onOrderChanged,
                         ),
                       ),
                     );
@@ -838,6 +846,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
                               orderId: selectedOrder.id,
                               session: session,
                               repository: repository,
+                              onOrderChanged: onOrderChanged,
                             ),
                           ),
                         ),

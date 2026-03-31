@@ -11,12 +11,14 @@ class PurchaseOrderDetailScreen extends StatelessWidget {
     required this.orderId,
     required this.session,
     required this.repository,
+    this.onOrderChanged,
     super.key,
   });
 
   final int orderId;
   final UserSession session;
   final PurchaseOrderRepository repository;
+  final Future<void> Function()? onOrderChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +33,7 @@ class PurchaseOrderDetailScreen extends StatelessWidget {
             orderId: orderId,
             session: session,
             repository: repository,
+            onOrderChanged: onOrderChanged,
           ),
         ),
       ),
@@ -44,6 +47,7 @@ class PurchaseOrderDetailPane extends StatefulWidget {
     required this.session,
     required this.repository,
     this.showRefreshAction = true,
+    this.onOrderChanged,
     super.key,
   });
 
@@ -51,6 +55,7 @@ class PurchaseOrderDetailPane extends StatefulWidget {
   final UserSession session;
   final PurchaseOrderRepository repository;
   final bool showRefreshAction;
+  final Future<void> Function()? onOrderChanged;
 
   @override
   State<PurchaseOrderDetailPane> createState() => _PurchaseOrderDetailPaneState();
@@ -84,6 +89,16 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
     _controller.load(id: widget.orderId, authToken: widget.session.token);
   }
 
+  Future<void> _send() async {
+    final sent = await _controller.send(
+      id: widget.orderId,
+      authToken: widget.session.token,
+    );
+    if (sent && widget.onOrderChanged != null) {
+      await widget.onOrderChanged!();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<PurchaseOrderDetailState>(
@@ -103,6 +118,7 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
             child: _PurchaseOrderDetailBody(
               state: state,
               onRetry: _load,
+              onSend: _send,
             ),
           ),
         ],
@@ -115,10 +131,12 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
   const _PurchaseOrderDetailBody({
     required this.state,
     required this.onRetry,
+    required this.onSend,
   });
 
   final PurchaseOrderDetailState state;
   final VoidCallback onRetry;
+  final Future<void> Function() onSend;
 
   @override
   Widget build(BuildContext context) {
@@ -170,12 +188,52 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                 color: Theme.of(context).colorScheme.error,
                 fontWeight: FontWeight.w600,
               ),
+              ),
+            ),
+        if (state.actionMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              state.actionMessage!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        if (state.actionErrorMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              state.actionErrorMessage!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         if (state.isLoading)
           const Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: LinearProgressIndicator(),
+          ),
+        if (order.canSend)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: state.isSending ? null : onSend,
+                icon: state.isSending
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send),
+                label: Text(state.isSending ? 'Slanje...' : 'Posalji narudzbu'),
+              ),
+            ),
           ),
         Card(
           child: Padding(

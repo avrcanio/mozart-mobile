@@ -467,10 +467,114 @@ void main() {
     expect(find.text('Sign in'), findsOneWidget);
     expect(await harness.storage.readToken(), isNull);
   });
+
+  testWidgets('sends eligible purchase order and refreshes detail state', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 7,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mozart',
+          'last_name': 'Operator',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 101,
+            'subject': 'Daily digest',
+            'from_email': 'office@mozart.local',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T10:15:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': <_FakeResponse>[
+          _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 33,
+              'reference': 'PO-SEND',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ]),
+          _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 33,
+              'reference': 'PO-SEND',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'sent',
+              'status_display': 'Poslana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ]),
+        ],
+        'GET /api/purchase-orders/33/': <_FakeResponse>[
+          _jsonResponse(<String, dynamic>{
+            'id': 33,
+            'reference': 'PO-SEND',
+            'supplier_name': 'Adriatic Trade',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '145.50',
+            'items': <Map<String, dynamic>>[],
+          }),
+          _jsonResponse(<String, dynamic>{
+            'id': 33,
+            'reference': 'PO-SEND',
+            'supplier_name': 'Adriatic Trade',
+            'status': 'sent',
+            'status_display': 'Poslana',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '145.50',
+            'items': <Map<String, dynamic>>[],
+          }),
+        ],
+        'POST /api/purchase-orders/33/send/': _jsonResponse(
+          <String, dynamic>{},
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('PO-SEND').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Posalji narudzbu'), findsOneWidget);
+
+    await tester.tap(find.text('Posalji narudzbu'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Narudzba je uspjesno poslana.'), findsOneWidget);
+    expect(find.text('Posalji narudzbu'), findsNothing);
+    expect(find.text('Poslana'), findsWidgets);
+  });
 }
 
 Future<_Harness> _createHarness({
-  required Map<String, _FakeResponse> responses,
+  required Map<String, dynamic> responses,
   String? savedToken,
 }) async {
   final transport = _FakeTransport(responses);
@@ -554,16 +658,25 @@ class _FakeResponse {
 class _FakeTransport implements ApiTransport {
   const _FakeTransport(this.responses);
 
-  final Map<String, _FakeResponse> responses;
+  final Map<String, dynamic> responses;
 
   @override
   Future<ApiResponse> send(ApiRequest request) async {
     final key = request.uri.hasQuery
         ? '${request.method} ${request.uri.path}?${request.uri.query}'
         : '${request.method} ${request.uri.path}';
-    final response = responses[key];
-    if (response == null) {
+    final candidate = responses[key];
+    if (candidate == null) {
       throw StateError('Missing fake response for $key');
+    }
+
+    late final _FakeResponse response;
+    if (candidate is _FakeResponse) {
+      response = candidate;
+    } else if (candidate is List<_FakeResponse> && candidate.isNotEmpty) {
+      response = candidate.removeAt(0);
+    } else {
+      throw StateError('Invalid fake response for $key');
     }
 
     return ApiResponse(
