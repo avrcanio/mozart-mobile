@@ -11,6 +11,7 @@ import '../dashboard_controller.dart';
 import '../mailbox_controller.dart';
 import '../purchase_orders_controller.dart';
 import '../session_scope.dart';
+import 'purchase_order_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -36,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final PurchaseOrdersController _purchaseOrdersController;
   int _index = 0;
   int? _selectedOrderId;
+  PurchaseOrder? _selectedOrderDetail;
 
   @override
   void initState() {
@@ -74,15 +76,33 @@ class _HomeScreenState extends State<HomeScreen> {
     if (orders.isEmpty) {
       setState(() {
         _selectedOrderId = null;
+        _selectedOrderDetail = null;
       });
       return;
     }
 
-    final hasSelected = _selectedOrderId != null &&
-        orders.any((order) => order.id == _selectedOrderId);
-    if (!hasSelected) {
+    PurchaseOrder? selectedOrder;
+    if (_selectedOrderId != null) {
+      for (final order in orders) {
+        if (order.id == _selectedOrderId) {
+          selectedOrder = order;
+          break;
+        }
+      }
+    }
+
+    if (selectedOrder == null) {
+      selectedOrder = orders.first;
       setState(() {
-        _selectedOrderId = orders.first.id;
+        _selectedOrderId = selectedOrder!.id;
+        _selectedOrderDetail = selectedOrder;
+      });
+      return;
+    }
+
+    if (_selectedOrderDetail?.id != selectedOrder.id) {
+      setState(() {
+        _selectedOrderDetail = selectedOrder;
       });
     }
   }
@@ -110,10 +130,21 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, state, _) => _PurchaseOrdersTab(
           state: state,
           onRetry: _loadAll,
+          repository: widget.purchaseOrderRepository,
+          session: widget.session,
           selectedOrderId: _selectedOrderId,
+          selectedOrderDetail: _selectedOrderDetail,
           onSelect: (orderId) {
+            PurchaseOrder? selectedOrder;
+            for (final order in state.orders) {
+              if (order.id == orderId) {
+                selectedOrder = order;
+                break;
+              }
+            }
             setState(() {
               _selectedOrderId = orderId;
+              _selectedOrderDetail = selectedOrder;
             });
           },
         ),
@@ -600,13 +631,19 @@ class _PurchaseOrdersTab extends StatelessWidget {
   const _PurchaseOrdersTab({
     required this.state,
     required this.onRetry,
+    required this.repository,
+    required this.session,
     required this.selectedOrderId,
+    required this.selectedOrderDetail,
     required this.onSelect,
   });
 
   final PurchaseOrdersState state;
   final VoidCallback onRetry;
+  final PurchaseOrderRepository repository;
+  final UserSession session;
   final int? selectedOrderId;
+  final PurchaseOrder? selectedOrderDetail;
   final ValueChanged<int> onSelect;
 
   @override
@@ -619,15 +656,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
       decimalDigits: 2,
     );
     final dateFormat = DateFormat('dd.MM.yyyy.', 'hr_HR');
-    PurchaseOrder? selectedOrder;
-    if (selectedOrderId != null) {
-      for (final order in state.orders) {
-        if (order.id == selectedOrderId) {
-          selectedOrder = order;
-          break;
-        }
-      }
-    }
+    final selectedOrder = selectedOrderDetail;
 
     final list = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -685,56 +714,25 @@ class _PurchaseOrdersTab extends StatelessWidget {
                   )),
                 ),
                 selected: selectedOrderId == order.id,
-                onTap: () => onSelect(order.id),
+                onTap: () {
+                  onSelect(order.id);
+                  if (!isWide) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => PurchaseOrderDetailScreen(
+                          orderId: order.id,
+                          session: session,
+                          repository: repository,
+                        ),
+                      ),
+                    );
+                  }
+                },
               ),
             ),
           ),
         ),
       ],
-    );
-
-    final detail = Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: selectedOrder == null
-            ? const Text('Select a purchase order to inspect its details.')
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    selectedOrder.reference,
-                    style: theme.textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Text('Supplier: ${selectedOrder.supplierName}'),
-                  const SizedBox(height: 8),
-                  Text('Datum: ${_formatDate(selectedOrder.orderedAt, dateFormat)}'),
-                  const SizedBox(height: 8),
-                  Text('Placanje: ${selectedOrder.paymentTypeName}'),
-                  const SizedBox(height: 8),
-                  Text('Status: ${selectedOrder.statusLabel}'),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Ukupno: ${selectedOrder.currency} ${currencyFormat.format(selectedOrder.totalAmount).trim()}',
-                  ),
-                  const SizedBox(height: 8),
-                  Text('Received qty: ${selectedOrder.receivedQuantity}'),
-                  const SizedBox(height: 8),
-                  Text('Remaining qty: ${selectedOrder.remainingQuantity}'),
-                  const SizedBox(height: 24),
-                  Text('Lines', style: theme.textTheme.titleLarge),
-                  const SizedBox(height: 12),
-                  ...selectedOrder.lines.map(
-                    (line) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Text(
-                        '${line.articleName}: qty ${line.quantity}, received ${line.receivedQuantity}, remaining ${line.remainingQuantity}, price ${line.unitPrice.toStringAsFixed(2)}',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-      ),
     );
 
     return _PageFrame(
@@ -744,16 +742,30 @@ class _PurchaseOrdersTab extends StatelessWidget {
               children: [
                 Expanded(child: SingleChildScrollView(child: list)),
                 const SizedBox(width: 16),
-                Expanded(child: detail),
+                Expanded(
+                  child: selectedOrder == null
+                      ? const Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              'Odaberite narudzbu za pregled detalja.',
+                            ),
+                          ),
+                        )
+                      : Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: PurchaseOrderDetailPane(
+                              orderId: selectedOrder.id,
+                              session: session,
+                              repository: repository,
+                            ),
+                          ),
+                        ),
+                ),
               ],
             )
-          : ListView(
-              children: [
-                list,
-                const SizedBox(height: 16),
-                detail,
-              ],
-            ),
+          : ListView(children: [list]),
     );
   }
 }
