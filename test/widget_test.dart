@@ -7,6 +7,6 @@ void main() {
     await tester.pump();
 
     expect(find.text('Mozart Mobile'), findsOneWidget);
-    expect(find.text('Sign in with token flow'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
   });
 }

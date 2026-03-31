@@ -12,12 +12,12 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'operator@mozart.local');
-  final _passwordController = TextEditingController(text: 'demo-password');
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -37,83 +37,96 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Mozart Mobile', style: theme.textTheme.displaySmall),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Flutter MVP shell for login, dashboard, mailbox, and purchase orders.',
-                          style: theme.textTheme.bodyLarge,
-                        ),
-                        const SizedBox(height: 24),
-                        TextField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            hintText: 'operator@company.com',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                          ),
-                        ),
-                        if (widget.state.errorMessage != null) ...[
-                          const SizedBox(height: 16),
-                          Text(
-                            widget.state.errorMessage!,
-                            style: TextStyle(
-                              color: theme.colorScheme.error,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: widget.state.isLoading
-                                ? null
-                                : () {
-                                    controller.login(
-                                      username: _emailController.text,
-                                      password: _passwordController.text,
-                                    );
-                                  },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              child: Text(
-                                widget.state.isLoading
-                                    ? 'Connecting...'
-                                    : 'Sign in with token flow',
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 44,
+                  ),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 460),
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Mozart Mobile',
+                                style: theme.textTheme.displaySmall,
                               ),
-                            ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Access purchase orders, messages, and daily operations in one place.',
+                                style: theme.textTheme.bodyLarge,
+                              ),
+                              const SizedBox(height: 28),
+                              TextField(
+                                controller: _usernameController,
+                                autocorrect: false,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: 'Username',
+                                  hintText: 'Enter your username',
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              TextField(
+                                controller: _passwordController,
+                                obscureText: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Password',
+                                  hintText: 'Enter your password',
+                                ),
+                              ),
+                              if (widget.state.errorMessage != null) ...[
+                                const SizedBox(height: 16),
+                                Text(
+                                  widget.state.errorMessage!,
+                                  style: TextStyle(
+                                    color: theme.colorScheme.error,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton(
+                                  onPressed: widget.state.isLoading
+                                      ? null
+                                      : () {
+                                          controller.login(
+                                            username: _usernameController.text,
+                                            password: _passwordController.text,
+                                          );
+                                        },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    child: Text(
+                                      widget.state.isLoading
+                                          ? 'Connecting...'
+                                          : 'Sign in',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Expected backend endpoints: POST /api/token/ and GET /api/me/',
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),

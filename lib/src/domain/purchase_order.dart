@@ -1,19 +1,47 @@
 class PurchaseOrder {
   const PurchaseOrder({
     required this.id,
-    required this.vendor,
+    required this.reference,
     required this.status,
-    required this.total,
+    required this.supplierName,
+    required this.paymentTypeName,
+    required this.totalAmount,
     required this.currency,
     required this.createdAt,
-    required this.buyer,
+    required this.lines,
   });
 
-  final String id;
-  final String vendor;
+  final int id;
+  final String reference;
   final String status;
-  final double total;
+  final String supplierName;
+  final String paymentTypeName;
+  final double totalAmount;
   final String currency;
-  final DateTime createdAt;
-  final String buyer;
+  final DateTime? createdAt;
+  final List<PurchaseOrderLine> lines;
+
+  double get receivedQuantity =>
+      lines.fold(0, (sum, line) => sum + line.receivedQuantity);
+
+  double get remainingQuantity =>
+      lines.fold(0, (sum, line) => sum + line.remainingQuantity);
+}
+
+class PurchaseOrderLine {
+  const PurchaseOrderLine({
+    required this.id,
+    required this.articleName,
+    required this.quantity,
+    required this.receivedQuantity,
+    required this.remainingQuantity,
+    required this.unitPrice,
+  });
+
+  final int id;
+  final String articleName;
+  final double quantity;
+  final double receivedQuantity;
+  final double remainingQuantity;
+  final double unitPrice;
 }

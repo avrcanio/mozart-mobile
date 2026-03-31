@@ -1,5 +1,8 @@
 import '../../domain/purchase_order.dart';
 import '../http/api_client.dart';
+import 'models/payment_type_dto.dart';
+import 'models/purchase_order_dto.dart';
+import 'models/supplier_dto.dart';
 
 class PurchaseOrderRepository {
   PurchaseOrderRepository({required ApiClient apiClient})
@@ -9,37 +12,107 @@ class PurchaseOrderRepository {
 
   Uri get listEndpoint => _apiClient.endpoint('/api/purchase-orders/');
 
-  Uri detailEndpoint(String id) => _apiClient.endpoint('/api/purchase-orders/$id/');
+  Uri detailEndpoint(int id) => _apiClient.endpoint('/api/purchase-orders/$id/');
 
-  Future<List<PurchaseOrder>> fetchPurchaseOrders() async {
-    return <PurchaseOrder>[
-      PurchaseOrder(
-        id: 'PO-2048',
-        vendor: 'Adriatic Components',
-        status: 'Needs approval',
-        total: 18420.50,
-        currency: 'EUR',
-        createdAt: DateTime(2026, 3, 29),
-        buyer: 'Marta Peric',
-      ),
-      PurchaseOrder(
-        id: 'PO-2052',
-        vendor: 'Nordic Steel',
-        status: 'In transit',
-        total: 9275.00,
-        currency: 'EUR',
-        createdAt: DateTime(2026, 3, 27),
-        buyer: 'Ivan Juric',
-      ),
-      PurchaseOrder(
-        id: 'PO-2055',
-        vendor: 'Blue Harbor Supply',
-        status: 'Draft',
-        total: 3120.75,
-        currency: 'EUR',
-        createdAt: DateTime(2026, 3, 26),
-        buyer: 'Ana Kovac',
-      ),
-    ];
+  Uri get suppliersEndpoint => _apiClient.endpoint('/api/suppliers/');
+
+  Uri get paymentTypesEndpoint => _apiClient.endpoint('/api/payment-types/');
+
+  Uri supplierArticlesEndpoint(int supplierId) =>
+      _apiClient.endpoint('/api/suppliers/$supplierId/artikli/');
+
+  Uri patchPriceEndpoint(int itemId) =>
+      _apiClient.endpoint('/api/purchase-order-items/$itemId/price/');
+
+  Uri warehouseInputsEndpoint(int orderId) =>
+      _apiClient.endpoint('/api/purchase-orders/$orderId/warehouse-inputs/');
+
+  Uri sendEndpoint(int orderId) =>
+      _apiClient.endpoint('/api/purchase-orders/$orderId/send/');
+
+  Future<List<PurchaseOrder>> fetchPurchaseOrders({
+    required String authToken,
+  }) async {
+    final jsonList = await _apiClient.getJsonList(
+      '/api/purchase-orders/',
+      authToken: authToken,
+    );
+    return jsonList
+        .whereType<Map<String, dynamic>>()
+        .map(PurchaseOrderDto.fromJson)
+        .map((dto) => dto.toDomain())
+        .toList();
+  }
+
+  Future<PurchaseOrder> fetchPurchaseOrderDetail({
+    required int id,
+    required String authToken,
+  }) async {
+    final json = await _apiClient.getJson(
+      '/api/purchase-orders/$id/',
+      authToken: authToken,
+    );
+    return PurchaseOrderDto.fromJson(json).toDomain();
+  }
+
+  Future<List<SupplierDto>> fetchSuppliers({
+    required String authToken,
+  }) async {
+    final jsonList = await _apiClient.getJsonList(
+      '/api/suppliers/',
+      authToken: authToken,
+    );
+    return jsonList
+        .whereType<Map<String, dynamic>>()
+        .map(SupplierDto.fromJson)
+        .toList();
+  }
+
+  Future<List<PaymentTypeDto>> fetchPaymentTypes({
+    required String authToken,
+  }) async {
+    final jsonList = await _apiClient.getJsonList(
+      '/api/payment-types/',
+      authToken: authToken,
+    );
+    return jsonList
+        .whereType<Map<String, dynamic>>()
+        .map(PaymentTypeDto.fromJson)
+        .toList();
+  }
+
+  Future<void> patchItemPrice({
+    required int itemId,
+    required double price,
+    required String authToken,
+  }) async {
+    await _apiClient.patchJson(
+      '/api/purchase-order-items/$itemId/price/',
+      authToken: authToken,
+      body: <String, dynamic>{'price': price},
+    );
+  }
+
+  Future<void> createWarehouseInput({
+    required int orderId,
+    required Map<String, dynamic> payload,
+    required String authToken,
+  }) async {
+    await _apiClient.postJson(
+      '/api/purchase-orders/$orderId/warehouse-inputs/',
+      authToken: authToken,
+      body: payload,
+    );
+  }
+
+  Future<void> sendPurchaseOrder({
+    required int orderId,
+    required String authToken,
+  }) async {
+    await _apiClient.postJson(
+      '/api/purchase-orders/$orderId/send/',
+      authToken: authToken,
+      body: const <String, dynamic>{},
+    );
   }
 }

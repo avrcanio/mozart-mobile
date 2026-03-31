@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_services_scope.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'session_scope.dart';
@@ -10,12 +11,18 @@ class AppView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = SessionScope.of(context);
+    final services = AppServicesScope.of(context);
 
     return ValueListenableBuilder<SessionState>(
       valueListenable: controller,
       builder: (context, state, _) {
         if (state.isAuthenticated) {
-          return HomeScreen(state: state);
+          return HomeScreen(
+            session: state.session!,
+            dashboardRepository: services.dashboardRepository,
+            mailboxRepository: services.mailboxRepository,
+            purchaseOrderRepository: services.purchaseOrderRepository,
+          );
         }
 
         return LoginScreen(state: state);

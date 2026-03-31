@@ -5,13 +5,17 @@ class MailMessage {
     required this.sender,
     required this.preview,
     required this.receivedAt,
-    required this.hasAttachments,
+    required this.attachments,
+    required this.isRead,
   });
 
-  final String id;
+  final int id;
   final String subject;
   final String sender;
   final String preview;
-  final DateTime receivedAt;
-  final bool hasAttachments;
+  final DateTime? receivedAt;
+  final List<String> attachments;
+  final bool isRead;
+
+  bool get hasAttachments => attachments.isNotEmpty;
 }

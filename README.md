@@ -20,7 +20,7 @@ Flutter MVP scaffold for issue `#1`, based on the migration brief from the exist
 - `GET /api/me/` for current user details
 - Existing mailbox and purchase order endpoints remain the source of truth
 
-This scaffold currently uses in-memory sample data so the mobile structure can be reviewed before wiring real API and persistent token storage.
+The app now performs real token-based auth and backend requests, but token persistence is still in-memory until secure device storage is added.
 
 ## Run
 
@@ -28,7 +28,9 @@ This scaffold currently uses in-memory sample data so the mobile structure can b
 flutter run
 ```
 
-Optional API base URL:
+Default API base URL: `https://mozart.sibenik1983.hr`
+
+Override the API base URL when needed:
 
 ```bash
 flutter run --dart-define=MOZART_API_BASE_URL=https://your-backend.example.com
@@ -37,6 +39,6 @@ flutter run --dart-define=MOZART_API_BASE_URL=https://your-backend.example.com
 ## Next implementation steps
 
 - Replace in-memory auth storage with secure device storage
-- Implement real HTTP DTOs and mappers for dashboard, mailbox, and purchase orders
+- Add purchase order create/edit forms around the existing mutation endpoints
 - Confirm logout semantics for token invalidation vs local sign-out
-- Add forms and mutations for purchase order create/edit flows
+- Expand mailbox detail and purchase-order detail screens beyond the current list/detail shell

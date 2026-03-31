@@ -1,62 +1,113 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/dashboard_summary.dart';
-import '../../domain/mail_message.dart';
+import '../../data/dashboard/dashboard_repository.dart';
+import '../../data/mailbox/mailbox_repository.dart';
+import '../../data/purchase_orders/purchase_order_repository.dart';
 import '../../domain/purchase_order.dart';
+import '../../domain/user_session.dart';
+import '../dashboard_controller.dart';
+import '../mailbox_controller.dart';
+import '../purchase_orders_controller.dart';
 import '../session_scope.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({required this.state, super.key});
+  const HomeScreen({
+    required this.session,
+    required this.dashboardRepository,
+    required this.mailboxRepository,
+    required this.purchaseOrderRepository,
+    super.key,
+  });
 
-  final SessionState state;
+  final UserSession session;
+  final DashboardRepository dashboardRepository;
+  final MailboxRepository mailboxRepository;
+  final PurchaseOrderRepository purchaseOrderRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late final DashboardController _dashboardController;
+  late final MailboxController _mailboxController;
+  late final PurchaseOrdersController _purchaseOrdersController;
   int _index = 0;
-  PurchaseOrder? _selectedOrder;
+  int? _selectedOrderId;
 
   @override
   void initState() {
     super.initState();
-    _selectedOrder = widget.state.purchaseOrders.isEmpty
-        ? null
-        : widget.state.purchaseOrders.first;
+    _dashboardController = DashboardController(
+      repository: widget.dashboardRepository,
+    );
+    _mailboxController = MailboxController(
+      repository: widget.mailboxRepository,
+    );
+    _purchaseOrdersController = PurchaseOrdersController(
+      repository: widget.purchaseOrderRepository,
+    );
+    _loadAll();
+    _purchaseOrdersController.addListener(_syncSelectedOrder);
   }
 
   @override
-  void didUpdateWidget(covariant HomeScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.state.purchaseOrders.isNotEmpty &&
-        !_containsOrder(widget.state.purchaseOrders, _selectedOrder)) {
-      _selectedOrder = widget.state.purchaseOrders.first;
-    }
+  void dispose() {
+    _purchaseOrdersController.removeListener(_syncSelectedOrder);
+    _dashboardController.dispose();
+    _mailboxController.dispose();
+    _purchaseOrdersController.dispose();
+    super.dispose();
   }
 
-  bool _containsOrder(List<PurchaseOrder> orders, PurchaseOrder? target) {
-    if (target == null) {
-      return false;
+  void _loadAll() {
+    final token = widget.session.token;
+    _dashboardController.load(token);
+    _mailboxController.load(token);
+    _purchaseOrdersController.load(token);
+  }
+
+  void _syncSelectedOrder() {
+    final orders = _purchaseOrdersController.value.orders;
+    if (orders.isEmpty) {
+      setState(() {
+        _selectedOrderId = null;
+      });
+      return;
     }
-    return orders.any((order) => order.id == target.id);
+
+    final hasSelected = _selectedOrderId != null &&
+        orders.any((order) => order.id == _selectedOrderId);
+    if (!hasSelected) {
+      setState(() {
+        _selectedOrderId = orders.first.id;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = SessionScope.of(context);
-    final state = widget.state;
+    final sessionController = SessionScope.of(context);
     final tabs = <Widget>[
-      _DashboardTab(summary: state.dashboardSummary),
-      _MailboxTab(messages: state.messages),
-      _PurchaseOrdersTab(
-        orders: state.purchaseOrders,
-        selectedOrder: _selectedOrder,
-        onSelect: (order) {
-          setState(() {
-            _selectedOrder = order;
-          });
-        },
+      ValueListenableBuilder<DashboardState>(
+        valueListenable: _dashboardController,
+        builder: (context, state, _) => _DashboardTab(state: state),
+      ),
+      ValueListenableBuilder<MailboxState>(
+        valueListenable: _mailboxController,
+        builder: (context, state, _) => _MailboxTab(state: state),
+      ),
+      ValueListenableBuilder<PurchaseOrdersState>(
+        valueListenable: _purchaseOrdersController,
+        builder: (context, state, _) => _PurchaseOrdersTab(
+          state: state,
+          selectedOrderId: _selectedOrderId,
+          onSelect: (orderId) {
+            setState(() {
+              _selectedOrderId = orderId;
+            });
+          },
+        ),
       ),
     ];
 
@@ -67,19 +118,19 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Text('Mozart Mobile'),
             Text(
-              state.session?.fullName ?? '',
+              widget.session.fullName,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
         actions: [
           IconButton(
-            onPressed: state.isLoading ? null : controller.refresh,
+            onPressed: _loadAll,
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
           ),
           IconButton(
-            onPressed: controller.logout,
+            onPressed: sessionController.logout,
             tooltip: 'Logout',
             icon: const Icon(Icons.logout),
           ),
@@ -134,14 +185,35 @@ class _PageFrame extends StatelessWidget {
   }
 }
 
-class _DashboardTab extends StatelessWidget {
-  const _DashboardTab({required this.summary});
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
 
-  final DashboardSummary? summary;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Text(
+        message,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.error,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardTab extends StatelessWidget {
+  const _DashboardTab({required this.state});
+
+  final DashboardState state;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final summary = state.summary;
     final tiles = [
       ('Open POs', '${summary?.openPurchaseOrders ?? 0}', Icons.inventory_2),
       ('Approvals', '${summary?.pendingApprovals ?? 0}', Icons.gpp_good),
@@ -155,10 +227,16 @@ class _DashboardTab extends StatelessWidget {
           Text('Dashboard', style: theme.textTheme.headlineMedium),
           const SizedBox(height: 8),
           Text(
-            'Mobile-first summary cards over the existing Django API.',
+            'Composed from mailbox and purchase order endpoints instead of a dedicated dashboard API.',
             style: theme.textTheme.bodyLarge,
           ),
           const SizedBox(height: 20),
+          if (state.errorMessage != null) _ErrorBanner(message: state.errorMessage!),
+          if (state.isLoading)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: LinearProgressIndicator(),
+            ),
           Wrap(
             spacing: 16,
             runSpacing: 16,
@@ -192,9 +270,9 @@ class _DashboardTab extends StatelessWidget {
 }
 
 class _MailboxTab extends StatelessWidget {
-  const _MailboxTab({required this.messages});
+  const _MailboxTab({required this.state});
 
-  final List<MailMessage> messages;
+  final MailboxState state;
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +280,7 @@ class _MailboxTab extends StatelessWidget {
 
     return _PageFrame(
       child: ListView.separated(
-        itemCount: messages.length + 1,
+        itemCount: state.messages.length + 1,
         separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           if (index == 0) {
@@ -212,22 +290,26 @@ class _MailboxTab extends StatelessWidget {
                 Text('Mailbox', style: theme.textTheme.headlineMedium),
                 const SizedBox(height: 8),
                 Text(
-                  'Master-detail ready list view for mobile triage.',
+                  'Backed by GET /api/mailbox/messages/ and detail endpoints.',
                   style: theme.textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 16),
+                if (state.errorMessage != null)
+                  _ErrorBanner(message: state.errorMessage!),
+                if (state.isLoading) const LinearProgressIndicator(),
+                if (state.isLoading) const SizedBox(height: 16),
               ],
             );
           }
 
-          final message = messages[index - 1];
+          final message = state.messages[index - 1];
           return Card(
             child: ListTile(
               contentPadding: const EdgeInsets.all(18),
               title: Text(message.subject),
               subtitle: Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text('${message.sender} • ${message.preview}'),
+                child: Text('${message.sender} | ${message.preview}'),
               ),
               trailing: message.hasAttachments
                   ? const Icon(Icons.attach_file)
@@ -242,19 +324,28 @@ class _MailboxTab extends StatelessWidget {
 
 class _PurchaseOrdersTab extends StatelessWidget {
   const _PurchaseOrdersTab({
-    required this.orders,
-    required this.selectedOrder,
+    required this.state,
+    required this.selectedOrderId,
     required this.onSelect,
   });
 
-  final List<PurchaseOrder> orders;
-  final PurchaseOrder? selectedOrder;
-  final ValueChanged<PurchaseOrder> onSelect;
+  final PurchaseOrdersState state;
+  final int? selectedOrderId;
+  final ValueChanged<int> onSelect;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isWide = MediaQuery.of(context).size.width >= 900;
+    PurchaseOrder? selectedOrder;
+    if (selectedOrderId != null) {
+      for (final order in state.orders) {
+        if (order.id == selectedOrderId) {
+          selectedOrder = order;
+          break;
+        }
+      }
+    }
 
     final list = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,25 +353,31 @@ class _PurchaseOrdersTab extends StatelessWidget {
         Text('Purchase Orders', style: theme.textTheme.headlineMedium),
         const SizedBox(height: 8),
         Text(
-          'List, detail, and create/edit actions are staged for the MVP.',
+          'List and detail views now target the existing purchase order contract.',
           style: theme.textTheme.bodyLarge,
         ),
         const SizedBox(height: 16),
-        ...orders.map(
+        if (state.errorMessage != null) _ErrorBanner(message: state.errorMessage!),
+        if (state.isLoading)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: LinearProgressIndicator(),
+          ),
+        ...state.orders.map(
           (order) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Card(
               child: ListTile(
                 contentPadding: const EdgeInsets.all(18),
-                title: Text('${order.id} • ${order.vendor}'),
+                title: Text('${order.reference} | ${order.supplierName}'),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    '${order.status} • ${order.currency} ${order.total.toStringAsFixed(2)}',
+                    '${order.status} | ${order.paymentTypeName} | ${order.currency} ${order.totalAmount.toStringAsFixed(2)}',
                   ),
                 ),
-                selected: selectedOrder?.id == order.id,
-                onTap: () => onSelect(order),
+                selected: selectedOrderId == order.id,
+                onTap: () => onSelect(order.id),
               ),
             ),
           ),
@@ -296,39 +393,34 @@ class _PurchaseOrdersTab extends StatelessWidget {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(selectedOrder!.id, style: theme.textTheme.headlineMedium),
+                  Text(
+                    selectedOrder.reference,
+                    style: theme.textTheme.headlineMedium,
+                  ),
                   const SizedBox(height: 12),
-                  Text('Vendor: ${selectedOrder!.vendor}'),
+                  Text('Supplier: ${selectedOrder.supplierName}'),
                   const SizedBox(height: 8),
-                  Text('Buyer: ${selectedOrder!.buyer}'),
+                  Text('Payment type: ${selectedOrder.paymentTypeName}'),
                   const SizedBox(height: 8),
-                  Text('Status: ${selectedOrder!.status}'),
+                  Text('Status: ${selectedOrder.status}'),
                   const SizedBox(height: 8),
                   Text(
-                    'Total: ${selectedOrder!.currency} ${selectedOrder!.total.toStringAsFixed(2)}',
+                    'Total: ${selectedOrder.currency} ${selectedOrder.totalAmount.toStringAsFixed(2)}',
                   ),
+                  const SizedBox(height: 8),
+                  Text('Received qty: ${selectedOrder.receivedQuantity}'),
+                  const SizedBox(height: 8),
+                  Text('Remaining qty: ${selectedOrder.remainingQuantity}'),
                   const SizedBox(height: 24),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      FilledButton(
-                        onPressed: () {},
-                        child: const Text('Create'),
+                  Text('Lines', style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  ...selectedOrder.lines.map(
+                    (line) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        '${line.articleName}: qty ${line.quantity}, received ${line.receivedQuantity}, remaining ${line.remainingQuantity}, price ${line.unitPrice.toStringAsFixed(2)}',
                       ),
-                      OutlinedButton(
-                        onPressed: () {},
-                        child: const Text('Edit'),
-                      ),
-                      OutlinedButton(
-                        onPressed: () {},
-                        child: const Text('Price Audit'),
-                      ),
-                      OutlinedButton(
-                        onPressed: () {},
-                        child: const Text('Warehouse Receipt'),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),

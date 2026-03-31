@@ -1,19 +1,32 @@
 import '../../domain/dashboard_summary.dart';
-import '../http/api_client.dart';
+import '../mailbox/mailbox_repository.dart';
+import '../purchase_orders/purchase_order_repository.dart';
 
 class DashboardRepository {
-  DashboardRepository({required ApiClient apiClient}) : _apiClient = apiClient;
+  DashboardRepository({
+    required MailboxRepository mailboxRepository,
+    required PurchaseOrderRepository purchaseOrderRepository,
+  })  : _mailboxRepository = mailboxRepository,
+        _purchaseOrderRepository = purchaseOrderRepository;
 
-  final ApiClient _apiClient;
+  final MailboxRepository _mailboxRepository;
+  final PurchaseOrderRepository _purchaseOrderRepository;
 
-  Uri get summaryEndpoint => _apiClient.endpoint('/api/dashboard/');
+  Future<DashboardSummary> fetchSummary({
+    required String authToken,
+  }) async {
+    final messages = await _mailboxRepository.fetchMessages(authToken: authToken);
+    final orders = await _purchaseOrderRepository.fetchPurchaseOrders(
+      authToken: authToken,
+    );
 
-  Future<DashboardSummary> fetchSummary() async {
-    return const DashboardSummary(
-      openPurchaseOrders: 18,
-      pendingApprovals: 5,
-      unreadMessages: 12,
-      activeWarehouses: 4,
+    return DashboardSummary(
+      openPurchaseOrders: orders.length,
+      pendingApprovals: orders
+          .where((order) => order.status.toLowerCase().contains('approval'))
+          .length,
+      unreadMessages: messages.where((message) => !message.isRead).length,
+      activeWarehouses: 0,
     );
   }
 }
