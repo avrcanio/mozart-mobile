@@ -27,11 +27,17 @@ class UserProfileDto {
   }
 
   UserSession toDomain(String token) {
+    final normalizedUsername = username.trim();
+    final normalizedFullName = fullName.trim();
+    final resolvedFullName = normalizedFullName.isEmpty
+        ? normalizedUsername
+        : normalizedFullName;
+
     return UserSession(
       token: token,
-      username: username,
+      username: normalizedUsername,
       email: email,
-      fullName: fullName.isEmpty ? username : fullName,
+      fullName: resolvedFullName,
     );
   }
 }

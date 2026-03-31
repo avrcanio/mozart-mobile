@@ -115,14 +115,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            const Text('Mozart Mobile'),
-            Text(
-              widget.session.fullName,
-              style: Theme.of(context).textTheme.bodySmall,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Mozart Mobile'),
+                  Text(
+                    widget.session.displayName,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 12),
+            _SessionIdentityBadge(session: widget.session),
           ],
         ),
         actions: [
@@ -166,6 +174,44 @@ class _HomeScreenState extends State<HomeScreen> {
             _index = index;
           });
         },
+      ),
+    );
+  }
+}
+
+class _SessionIdentityBadge extends StatelessWidget {
+  const _SessionIdentityBadge({required this.session});
+
+  final UserSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            session.displayName,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            session.secondaryIdentity,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
       ),
     );
   }
