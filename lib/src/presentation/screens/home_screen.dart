@@ -262,56 +262,175 @@ class _DashboardTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final summary = state.summary;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth >= 900
+        ? 4
+        : screenWidth >= 640
+            ? 3
+            : 2;
     final tiles = [
-      ('Open POs', '${summary?.openPurchaseOrders ?? 0}', Icons.inventory_2),
-      ('Approvals', '${summary?.pendingApprovals ?? 0}', Icons.gpp_good),
-      ('Unread Mail', '${summary?.unreadMessages ?? 0}', Icons.mark_email_unread),
-      ('Warehouses', '${summary?.activeWarehouses ?? 0}', Icons.warehouse),
+      (
+        'Open POs',
+        '${summary?.openPurchaseOrders ?? 0}',
+        Icons.inventory_2,
+        const Color(0xFFF3E2D4),
+      ),
+      (
+        'Approvals',
+        '${summary?.pendingApprovals ?? 0}',
+        Icons.gpp_good,
+        const Color(0xFFE2ECE0),
+      ),
+      (
+        'Unread Mail',
+        '${summary?.unreadMessages ?? 0}',
+        Icons.mark_email_unread,
+        const Color(0xFFF6E8D8),
+      ),
+      (
+        'Warehouses',
+        '${summary?.activeWarehouses ?? 0}',
+        Icons.warehouse,
+        const Color(0xFFE7E0D6),
+      ),
     ];
 
     return _PageFrame(
       child: ListView(
         children: [
           Text('Dashboard', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'Pregled najvaznijih obaveza i stanja za danasnji rad.',
             style: theme.textTheme.bodyLarge,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           if (state.errorMessage != null) _ErrorBanner(message: state.errorMessage!),
           if (state.isLoading)
             const Padding(
-              padding: EdgeInsets.only(bottom: 16),
+              padding: EdgeInsets.only(bottom: 12),
               child: LinearProgressIndicator(),
             ),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: tiles
-                .map(
-                  (tile) => SizedBox(
-                    width: 220,
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(tile.$3, size: 28),
-                            const SizedBox(height: 14),
-                            Text(tile.$1, style: theme.textTheme.titleMedium),
-                            const SizedBox(height: 8),
-                            Text(tile.$2, style: theme.textTheme.displaySmall),
-                          ],
-                        ),
-                      ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      Icons.insights,
+                      color: theme.colorScheme.primary,
                     ),
                   ),
-                )
-                .toList(),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Brzi pregled',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Najbitnije stavke su odmah dostupne bez dodatnog skrolanja.',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: tiles.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: screenWidth < 420 ? 1.18 : 1.32,
+            ),
+            itemBuilder: (context, index) {
+              final tile = tiles[index];
+              return _DashboardMetricCard(
+                label: tile.$1,
+                value: tile.$2,
+                icon: tile.$3,
+                tone: tile.$4,
+              );
+            },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DashboardMetricCard extends StatelessWidget {
+  const _DashboardMetricCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.tone,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: tone,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontSize: 26,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
