@@ -6,7 +6,9 @@ import '../../data/mailbox/mailbox_repository.dart';
 import '../../data/purchase_orders/purchase_order_repository.dart';
 import '../../domain/mail_message.dart';
 import '../../domain/purchase_order.dart';
+import '../../domain/purchase_order_filters.dart';
 import '../../domain/user_session.dart';
+import '../../data/purchase_orders/models/supplier_dto.dart';
 import '../dashboard_controller.dart';
 import '../mailbox_controller.dart';
 import '../purchase_orders_controller.dart';
@@ -72,6 +74,32 @@ class _HomeScreenState extends State<HomeScreen> {
     _purchaseOrdersController.load(token);
   }
 
+  Future<void> _showPurchaseOrderFilters(PurchaseOrdersState state) async {
+    await _purchaseOrdersController.ensureSuppliersLoaded(widget.session.token);
+    if (!mounted) {
+      return;
+    }
+
+    final filters = await showModalBottomSheet<PurchaseOrderFilters>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _PurchaseOrderFilterSheet(
+        initialFilters: state.filters,
+        suppliers: _purchaseOrdersController.value.suppliers,
+      ),
+    );
+
+    if (filters == null) {
+      return;
+    }
+
+    await _purchaseOrdersController.applyFilters(widget.session.token, filters);
+  }
+
+  Future<void> _resetPurchaseOrderFilters() async {
+    await _purchaseOrdersController.resetFilters(widget.session.token);
+  }
+
   void _syncSelectedOrder() {
     final orders = _purchaseOrdersController.value.orders;
     if (orders.isEmpty) {
@@ -133,6 +161,8 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, state, _) => _PurchaseOrdersTab(
           state: state,
           onRetry: _loadAll,
+          onOpenFilters: () => _showPurchaseOrderFilters(state),
+          onResetFilters: _resetPurchaseOrderFilters,
           repository: widget.purchaseOrderRepository,
           session: widget.session,
           selectedOrderId: _selectedOrderId,
@@ -649,6 +679,8 @@ class _PurchaseOrdersTab extends StatelessWidget {
   const _PurchaseOrdersTab({
     required this.state,
     required this.onRetry,
+    required this.onOpenFilters,
+    required this.onResetFilters,
     required this.repository,
     required this.session,
     required this.selectedOrderId,
@@ -658,6 +690,8 @@ class _PurchaseOrdersTab extends StatelessWidget {
 
   final PurchaseOrdersState state;
   final VoidCallback onRetry;
+  final VoidCallback onOpenFilters;
+  final VoidCallback onResetFilters;
   final PurchaseOrderRepository repository;
   final UserSession session;
   final int? selectedOrderId;
@@ -686,6 +720,33 @@ class _PurchaseOrdersTab extends StatelessWidget {
           style: theme.textTheme.bodyLarge,
         ),
         const SizedBox(height: 16),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: onOpenFilters,
+              icon: const Icon(Icons.tune),
+              label: Text(
+                state.hasActiveFilters ? 'Filteri aktivni' : 'Filteri',
+              ),
+            ),
+            if (state.hasActiveFilters) ...[
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: onResetFilters,
+                child: const Text('Reset'),
+              ),
+            ],
+          ],
+        ),
+        if (state.hasActiveFilters) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _buildFilterChips(state.filters, state.suppliers),
+          ),
+          const SizedBox(height: 16),
+        ],
         if (state.errorMessage != null && state.hasContent)
           _ErrorBanner(message: state.errorMessage!),
         if (state.isLoading && state.hasContent)
@@ -786,6 +847,255 @@ class _PurchaseOrdersTab extends StatelessWidget {
           : ListView(children: [list]),
     );
   }
+}
+
+List<Widget> _buildFilterChips(
+  PurchaseOrderFilters filters,
+  List<SupplierDto> suppliers,
+) {
+  final chips = <Widget>[];
+
+  if ((filters.status ?? '').trim().isNotEmpty) {
+    chips.add(
+      Chip(
+        label: Text('Status: ${_statusLabel(filters.status!)}'),
+      ),
+    );
+  }
+
+  if (filters.supplierId != null) {
+    String? supplierName;
+    for (final supplier in suppliers) {
+      if (supplier.id == filters.supplierId) {
+        supplierName = supplier.name;
+        break;
+      }
+    }
+    chips.add(
+      Chip(
+        label: Text('Dobavljac: ${supplierName ?? '#${filters.supplierId}'}'),
+      ),
+    );
+  }
+
+  final dateFormat = DateFormat('dd.MM.yyyy.', 'hr_HR');
+  if (filters.orderedFrom != null) {
+    chips.add(
+      Chip(
+        label: Text('Od: ${dateFormat.format(filters.orderedFrom!.toLocal())}'),
+      ),
+    );
+  }
+  if (filters.orderedTo != null) {
+    chips.add(
+      Chip(
+        label: Text('Do: ${dateFormat.format(filters.orderedTo!.toLocal())}'),
+      ),
+    );
+  }
+
+  return chips;
+}
+
+const List<({String value, String label})> _purchaseOrderStatusOptions = [
+  (value: 'created', label: 'Kreirana'),
+  (value: 'sent', label: 'Poslana'),
+  (value: 'confirmed', label: 'Potvrdena'),
+  (value: 'received', label: 'Djelomicno zaprimljena'),
+  (value: 'received_all', label: 'Sve zaprimljeno'),
+  (value: 'canceled', label: 'Otkazana'),
+];
+
+String _statusLabel(String value) {
+  for (final option in _purchaseOrderStatusOptions) {
+    if (option.value == value) {
+      return option.label;
+    }
+  }
+  return value;
+}
+
+class _PurchaseOrderFilterSheet extends StatefulWidget {
+  const _PurchaseOrderFilterSheet({
+    required this.initialFilters,
+    required this.suppliers,
+  });
+
+  final PurchaseOrderFilters initialFilters;
+  final List<SupplierDto> suppliers;
+
+  @override
+  State<_PurchaseOrderFilterSheet> createState() =>
+      _PurchaseOrderFilterSheetState();
+}
+
+class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
+  late String? _status;
+  late int? _supplierId;
+  late final TextEditingController _orderedFromController;
+  late final TextEditingController _orderedToController;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = widget.initialFilters.status;
+    _supplierId = widget.initialFilters.supplierId;
+    _orderedFromController = TextEditingController(
+      text: _formatInputDate(widget.initialFilters.orderedFrom),
+    );
+    _orderedToController = TextEditingController(
+      text: _formatInputDate(widget.initialFilters.orderedTo),
+    );
+  }
+
+  @override
+  void dispose() {
+    _orderedFromController.dispose();
+    _orderedToController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final insets = MediaQuery.of(context).viewInsets.bottom;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + insets),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Filteri narudzbi',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String?>(
+                key: const Key('po-filter-status'),
+                initialValue: _status,
+                decoration: const InputDecoration(
+                  labelText: 'Status',
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Svi statusi'),
+                  ),
+                  ..._purchaseOrderStatusOptions.map(
+                    (option) => DropdownMenuItem<String?>(
+                      value: option.value,
+                      child: Text(option.label),
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _status = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<int?>(
+                key: const Key('po-filter-supplier'),
+                initialValue: _supplierId,
+                decoration: const InputDecoration(
+                  labelText: 'Dobavljac',
+                ),
+                items: [
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('Svi dobavljaci'),
+                  ),
+                  ...widget.suppliers.map(
+                    (supplier) => DropdownMenuItem<int?>(
+                      value: supplier.id,
+                      child: Text(supplier.name),
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _supplierId = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                key: const Key('po-filter-ordered-from'),
+                controller: _orderedFromController,
+                decoration: const InputDecoration(
+                  labelText: 'Naruceno od',
+                  hintText: 'YYYY-MM-DD',
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                key: const Key('po-filter-ordered-to'),
+                controller: _orderedToController,
+                decoration: const InputDecoration(
+                  labelText: 'Naruceno do',
+                  hintText: 'YYYY-MM-DD',
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(const PurchaseOrderFilters());
+                    },
+                    child: const Text('Reset'),
+                  ),
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(
+                        PurchaseOrderFilters(
+                          status: _emptyToNull(_status),
+                          supplierId: _supplierId,
+                          orderedFrom: _parseInputDate(_orderedFromController.text),
+                          orderedTo: _parseInputDate(_orderedToController.text),
+                        ),
+                      );
+                    },
+                    child: const Text('Primijeni'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String? _emptyToNull(String? value) {
+  if (value == null) {
+    return null;
+  }
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
+DateTime? _parseInputDate(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(trimmed);
+}
+
+String _formatInputDate(DateTime? value) {
+  if (value == null) {
+    return '';
+  }
+  final normalized = value.toLocal();
+  final month = normalized.month.toString().padLeft(2, '0');
+  final day = normalized.day.toString().padLeft(2, '0');
+  return '${normalized.year}-$month-$day';
 }
 
 class _TabStateCard extends StatelessWidget {

@@ -18,11 +18,12 @@ class ApiClient {
   Future<JsonMap> getJson(
     String path, {
     String? authToken,
+    Map<String, String>? queryParameters,
   }) async {
     final response = await _send(
       ApiRequest(
         method: 'GET',
-        uri: _endpoint(path),
+        uri: _endpoint(path, queryParameters: queryParameters),
         headers: _headers(authToken: authToken),
       ),
     );
@@ -32,11 +33,12 @@ class ApiClient {
   Future<List<dynamic>> getJsonList(
     String path, {
     String? authToken,
+    Map<String, String>? queryParameters,
   }) async {
     final response = await _send(
       ApiRequest(
         method: 'GET',
-        uri: _endpoint(path),
+        uri: _endpoint(path, queryParameters: queryParameters),
         headers: _headers(authToken: authToken),
       ),
     );
@@ -87,9 +89,10 @@ class ApiClient {
     return _decodeMap(response);
   }
 
-  Uri endpoint(String path) => _endpoint(path);
+  Uri endpoint(String path, {Map<String, String>? queryParameters}) =>
+      _endpoint(path, queryParameters: queryParameters);
 
-  Uri _endpoint(String path) {
+  Uri _endpoint(String path, {Map<String, String>? queryParameters}) {
     if (baseUrl.isEmpty) {
       throw const ApiException(
         'Missing API base URL.',
@@ -98,7 +101,11 @@ class ApiClient {
 
     final normalizedBase = baseUrl.replaceAll(RegExp(r'/$'), '');
     final normalizedPath = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$normalizedBase$normalizedPath');
+    final uri = Uri.parse('$normalizedBase$normalizedPath');
+    if (queryParameters == null || queryParameters.isEmpty) {
+      return uri;
+    }
+    return uri.replace(queryParameters: queryParameters);
   }
 
   Map<String, String> _headers({String? authToken}) {

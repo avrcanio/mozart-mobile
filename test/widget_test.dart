@@ -301,6 +301,105 @@ void main() {
     expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
     expect(find.text('Pokusaj ponovno'), findsOneWidget);
   });
+
+  testWidgets('applies and resets purchase order filters on mobile', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, _FakeResponse>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'reference': 'PO-BASE',
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+          <String, dynamic>{'id': 3, 'name': 'Coffee Logistics'},
+        ]),
+        'GET /api/purchase-orders/?status=sent&supplier=2&ordered_from=2026-04-02&ordered_to=2026-04-03':
+            _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 2048,
+                'reference': 'PO-FILTERED',
+                'supplier_name': 'Blue Harbor Supply',
+                'status': 'sent',
+                'status_display': 'Poslana',
+                'payment_type_name': 'Karticno',
+                'ordered_at': '2026-04-02T11:30:00Z',
+                'total_gross': '18420.50',
+                'items': <Map<String, dynamic>>[],
+              },
+            ]),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Filteri'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-filter-status')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Poslana').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-filter-supplier')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Blue Harbor Supply').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-filter-ordered-from')),
+      '2026-04-02',
+    );
+    await tester.enterText(
+      find.byKey(const Key('po-filter-ordered-to')),
+      '2026-04-03',
+    );
+
+    await tester.tap(find.text('Primijeni'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-FILTERED'), findsOneWidget);
+    expect(find.text('Status: Poslana'), findsOneWidget);
+    expect(find.text('Dobavljac: Blue Harbor Supply'), findsOneWidget);
+
+    await tester.tap(find.text('Reset'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-BASE'), findsOneWidget);
+    expect(find.text('Status: Poslana'), findsNothing);
+  });
 }
 
 Future<_Harness> _createHarness({
@@ -386,7 +485,9 @@ class _FakeTransport implements ApiTransport {
 
   @override
   Future<ApiResponse> send(ApiRequest request) async {
-    final key = '${request.method} ${request.uri.path}';
+    final key = request.uri.hasQuery
+        ? '${request.method} ${request.uri.path}?${request.uri.query}'
+        : '${request.method} ${request.uri.path}';
     final response = responses[key];
     if (response == null) {
       throw StateError('Missing fake response for $key');

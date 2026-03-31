@@ -1,4 +1,5 @@
 import '../../domain/purchase_order.dart';
+import '../../domain/purchase_order_filters.dart';
 import '../http/api_client.dart';
 import 'models/payment_type_dto.dart';
 import 'models/purchase_order_dto.dart';
@@ -32,10 +33,12 @@ class PurchaseOrderRepository {
 
   Future<List<PurchaseOrder>> fetchPurchaseOrders({
     required String authToken,
+    PurchaseOrderFilters filters = const PurchaseOrderFilters(),
   }) async {
     final jsonList = await _apiClient.getJsonList(
       '/api/purchase-orders/',
       authToken: authToken,
+      queryParameters: filters.toQueryParameters(),
     );
     return jsonList
         .whereType<Map<String, dynamic>>()
