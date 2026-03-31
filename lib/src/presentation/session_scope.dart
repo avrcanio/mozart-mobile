@@ -85,7 +85,7 @@ class SessionController extends ValueNotifier<SessionState> {
     } catch (_) {
       value = value.copyWith(
         isLoading: false,
-        errorMessage: 'Login failed. Check the backend contract and API URL.',
+        errorMessage: 'Prijava nije uspjela. Provjerite korisnicke podatke i pokusajte ponovno.',
       );
     }
   }

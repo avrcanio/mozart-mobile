@@ -229,7 +229,7 @@ class _DashboardTab extends StatelessWidget {
           Text('Dashboard', style: theme.textTheme.headlineMedium),
           const SizedBox(height: 8),
           Text(
-            'Composed from mailbox and purchase order endpoints instead of a dedicated dashboard API.',
+            'Pregled najvaznijih obaveza i stanja za danasnji rad.',
             style: theme.textTheme.bodyLarge,
           ),
           const SizedBox(height: 20),
@@ -293,7 +293,7 @@ class _MailboxTab extends StatelessWidget {
                 Text('Mailbox', style: theme.textTheme.headlineMedium),
                 const SizedBox(height: 8),
                 Text(
-                  'Backed by GET /api/mailbox/messages/ and detail endpoints.',
+                  'Pregledajte nove poruke i priloge na jednom mjestu.',
                   style: theme.textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 16),
@@ -400,7 +400,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
         Text('Purchase Orders', style: theme.textTheme.headlineMedium),
         const SizedBox(height: 8),
         Text(
-          'List and detail views now target the existing purchase order contract.',
+          'Pratite narudzbe, statuse i osnovne detalje isporuke.',
           style: theme.textTheme.bodyLarge,
         ),
         const SizedBox(height: 16),
