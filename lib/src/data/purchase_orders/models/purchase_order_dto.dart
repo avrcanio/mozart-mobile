@@ -5,22 +5,24 @@ class PurchaseOrderDto {
     required this.id,
     required this.reference,
     required this.status,
+    required this.statusLabel,
     required this.supplierName,
     required this.paymentTypeName,
     required this.totalAmount,
     required this.currency,
-    required this.createdAt,
+    required this.orderedAt,
     required this.lines,
   });
 
   final int id;
   final String reference;
   final String status;
+  final String statusLabel;
   final String supplierName;
   final String paymentTypeName;
   final double totalAmount;
   final String currency;
-  final DateTime? createdAt;
+  final DateTime? orderedAt;
   final List<PurchaseOrderLineDto> lines;
 
   factory PurchaseOrderDto.fromJson(Map<String, dynamic> json) {
@@ -40,22 +42,33 @@ class PurchaseOrderDto {
               json['id'] ??
               '')
           .toString(),
-      status: (json['status'] ?? 'Unknown').toString(),
+      status: (json['status'] ?? 'unknown').toString(),
+      statusLabel: _asLabel(
+        json['status_display'],
+        fallback: json['status'],
+        emptyFallback: 'Nepoznato',
+      ),
       supplierName: (json['supplier_name'] ??
               json['supplier']?['name'] ??
               json['supplier'] ??
               '')
-          .toString(),
+          .toString()
+          .trim(),
       paymentTypeName: (json['payment_type_name'] ??
               json['payment_type']?['name'] ??
               json['payment_type'] ??
               '')
-          .toString(),
+          .toString()
+          .trim(),
       totalAmount: _asDouble(
-        json['total_amount'] ?? json['total'] ?? json['gross_total'],
+        json['total_gross'] ??
+            json['gross_total'] ??
+            json['total_amount'] ??
+            json['total'] ??
+            json['total_net'],
       ),
       currency: (json['currency'] ?? 'EUR').toString(),
-      createdAt: _asDateTime(json['created_at']),
+      orderedAt: _asDateTime(json['ordered_at'] ?? json['created_at']),
       lines: lines,
     );
   }
@@ -65,11 +78,13 @@ class PurchaseOrderDto {
       id: id,
       reference: reference,
       status: status,
-      supplierName: supplierName,
-      paymentTypeName: paymentTypeName,
+      statusLabel: statusLabel,
+      supplierName: supplierName.isEmpty ? 'Nepoznati dobavljac' : supplierName,
+      paymentTypeName:
+          paymentTypeName.isEmpty ? 'Nije definirano' : paymentTypeName,
       totalAmount: totalAmount,
       currency: currency,
-      createdAt: createdAt,
+      orderedAt: orderedAt,
       lines: lines.map((line) => line.toDomain()).toList(),
     );
   }
@@ -93,6 +108,22 @@ class PurchaseOrderDto {
       return null;
     }
     return DateTime.tryParse(value.toString());
+  }
+
+  static String _asLabel(
+    dynamic value, {
+    dynamic fallback,
+    required String emptyFallback,
+  }) {
+    final primary = value?.toString().trim() ?? '';
+    if (primary.isNotEmpty) {
+      return primary;
+    }
+    final secondary = fallback?.toString().trim() ?? '';
+    if (secondary.isNotEmpty) {
+      return secondary;
+    }
+    return emptyFallback;
   }
 }
 

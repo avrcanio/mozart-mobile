@@ -3,22 +3,24 @@ class PurchaseOrder {
     required this.id,
     required this.reference,
     required this.status,
+    required this.statusLabel,
     required this.supplierName,
     required this.paymentTypeName,
     required this.totalAmount,
     required this.currency,
-    required this.createdAt,
+    required this.orderedAt,
     required this.lines,
   });
 
   final int id;
   final String reference;
   final String status;
+  final String statusLabel;
   final String supplierName;
   final String paymentTypeName;
   final double totalAmount;
   final String currency;
-  final DateTime? createdAt;
+  final DateTime? orderedAt;
   final List<PurchaseOrderLine> lines;
 
   double get receivedQuantity =>

@@ -2,20 +2,20 @@ class MailMessage {
   const MailMessage({
     required this.id,
     required this.subject,
-    required this.sender,
+    required this.fromEmail,
     required this.preview,
-    required this.receivedAt,
-    required this.attachments,
+    required this.sentAt,
+    required this.attachmentCount,
     required this.isRead,
   });
 
   final int id;
   final String subject;
-  final String sender;
+  final String fromEmail;
   final String preview;
-  final DateTime? receivedAt;
-  final List<String> attachments;
+  final DateTime? sentAt;
+  final int attachmentCount;
   final bool isRead;
 
-  bool get hasAttachments => attachments.isNotEmpty;
+  bool get hasAttachments => attachmentCount > 0;
 }

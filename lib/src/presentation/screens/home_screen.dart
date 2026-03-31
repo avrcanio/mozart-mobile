@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../data/dashboard/dashboard_repository.dart';
 import '../../data/mailbox/mailbox_repository.dart';
 import '../../data/purchase_orders/purchase_order_repository.dart';
+import '../../domain/mail_message.dart';
 import '../../domain/purchase_order.dart';
 import '../../domain/user_session.dart';
 import '../dashboard_controller.dart';
@@ -277,6 +279,7 @@ class _MailboxTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dateTimeFormat = DateFormat('dd.MM.yyyy. HH:mm', 'hr_HR');
 
     return _PageFrame(
       child: ListView.separated(
@@ -309,15 +312,53 @@ class _MailboxTab extends StatelessWidget {
               title: Text(message.subject),
               subtitle: Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text('${message.sender} | ${message.preview}'),
+                child: Text(
+                  _buildMailboxSubtitle(message, dateTimeFormat: dateTimeFormat),
+                ),
               ),
               trailing: message.hasAttachments
-                  ? const Icon(Icons.attach_file)
+                  ? _MailboxAttachmentCount(count: message.attachmentCount)
                   : const SizedBox.shrink(),
             ),
           );
         },
       ),
+    );
+  }
+}
+
+String _buildMailboxSubtitle(
+  MailMessage message, {
+  required DateFormat dateTimeFormat,
+}) {
+  final parts = <String>[
+    message.fromEmail,
+  ];
+
+  if (message.preview.isNotEmpty) {
+    parts.add(message.preview);
+  }
+
+  if (message.sentAt != null) {
+    parts.add(dateTimeFormat.format(message.sentAt!.toLocal()));
+  }
+
+  return parts.join(' | ');
+}
+
+class _MailboxAttachmentCount extends StatelessWidget {
+  const _MailboxAttachmentCount({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.attach_file),
+        Text('$count'),
+      ],
     );
   }
 }
@@ -337,6 +378,12 @@ class _PurchaseOrdersTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isWide = MediaQuery.of(context).size.width >= 900;
+    final currencyFormat = NumberFormat.currency(
+      locale: 'hr_HR',
+      symbol: '',
+      decimalDigits: 2,
+    );
+    final dateFormat = DateFormat('dd.MM.yyyy.', 'hr_HR');
     PurchaseOrder? selectedOrder;
     if (selectedOrderId != null) {
       for (final order in state.orders) {
@@ -372,9 +419,11 @@ class _PurchaseOrdersTab extends StatelessWidget {
                 title: Text('${order.reference} | ${order.supplierName}'),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '${order.status} | ${order.paymentTypeName} | ${order.currency} ${order.totalAmount.toStringAsFixed(2)}',
-                  ),
+                  child: Text(_buildOrderListSubtitle(
+                    order,
+                    currencyFormat: currencyFormat,
+                    dateFormat: dateFormat,
+                  )),
                 ),
                 selected: selectedOrderId == order.id,
                 onTap: () => onSelect(order.id),
@@ -400,12 +449,14 @@ class _PurchaseOrdersTab extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text('Supplier: ${selectedOrder.supplierName}'),
                   const SizedBox(height: 8),
-                  Text('Payment type: ${selectedOrder.paymentTypeName}'),
+                  Text('Datum: ${_formatDate(selectedOrder.orderedAt, dateFormat)}'),
                   const SizedBox(height: 8),
-                  Text('Status: ${selectedOrder.status}'),
+                  Text('Placanje: ${selectedOrder.paymentTypeName}'),
+                  const SizedBox(height: 8),
+                  Text('Status: ${selectedOrder.statusLabel}'),
                   const SizedBox(height: 8),
                   Text(
-                    'Total: ${selectedOrder.currency} ${selectedOrder.totalAmount.toStringAsFixed(2)}',
+                    'Ukupno: ${selectedOrder.currency} ${currencyFormat.format(selectedOrder.totalAmount).trim()}',
                   ),
                   const SizedBox(height: 8),
                   Text('Received qty: ${selectedOrder.receivedQuantity}'),
@@ -446,4 +497,29 @@ class _PurchaseOrdersTab extends StatelessWidget {
             ),
     );
   }
+}
+
+String _buildOrderListSubtitle(
+  PurchaseOrder order, {
+  required NumberFormat currencyFormat,
+  required DateFormat dateFormat,
+}) {
+  final parts = <String>[
+    order.statusLabel,
+    order.paymentTypeName,
+    '${order.currency} ${currencyFormat.format(order.totalAmount).trim()}',
+  ];
+
+  if (order.orderedAt != null) {
+    parts.add(_formatDate(order.orderedAt, dateFormat));
+  }
+
+  return parts.join(' | ');
+}
+
+String _formatDate(DateTime? value, DateFormat formatter) {
+  if (value == null) {
+    return 'Bez datuma';
+  }
+  return formatter.format(value.toLocal());
 }
