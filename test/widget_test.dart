@@ -1362,6 +1362,220 @@ void main() {
     expect(find.textContaining('PO-BASE'), findsNothing);
   });
 
+  testWidgets('loads additional purchase order pages on demand', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 1,
+              'reference': 'PO-001',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '99.99',
+              'items': <Map<String, dynamic>>[],
+            },
+            <String, dynamic>{
+              'id': 2,
+              'reference': 'PO-002',
+              'supplier_name': 'Coffee Logistics',
+              'status': 'sent',
+              'status_display': 'Poslana',
+              'payment_type_name': 'Karticno',
+              'ordered_at': '2026-04-02T09:30:00Z',
+              'total_gross': '149.99',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/?page=2': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 3,
+              'reference': 'PO-003',
+              'supplier_name': 'Warehouse One',
+              'status': 'confirmed',
+              'status_display': 'Potvrdena',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-03T09:30:00Z',
+              'total_gross': '199.99',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-001'), findsOneWidget);
+    expect(find.textContaining('PO-002'), findsOneWidget);
+    expect(find.textContaining('PO-003'), findsNothing);
+    expect(find.text('Ucitaj jos'), findsOneWidget);
+    expect(find.text('Prikazano 2 od 3 narudzbi.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('po-load-more')));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-003'), findsOneWidget);
+    expect(find.text('Ucitaj jos'), findsNothing);
+  });
+
+  testWidgets('keeps active filters applied across purchase order pagination', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'reference': 'PO-BASE',
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+        ]),
+        'GET /api/purchase-orders/?status=sent': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 101,
+              'reference': 'PO-SENT-1',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'sent',
+              'status_display': 'Poslana',
+              'payment_type_name': 'Karticno',
+              'ordered_at': '2026-04-02T11:30:00Z',
+              'total_gross': '18420.50',
+              'items': <Map<String, dynamic>>[],
+            },
+            <String, dynamic>{
+              'id': 102,
+              'reference': 'PO-SENT-2',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'sent',
+              'status_display': 'Poslana',
+              'payment_type_name': 'Karticno',
+              'ordered_at': '2026-04-03T11:30:00Z',
+              'total_gross': '28420.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/?status=sent&page=2': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 103,
+              'reference': 'PO-SENT-3',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'sent',
+              'status_display': 'Poslana',
+              'payment_type_name': 'Karticno',
+              'ordered_at': '2026-04-04T11:30:00Z',
+              'total_gross': '38420.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Filteri'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-filter-status')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Poslana').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Primijeni'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-SENT-1'), findsOneWidget);
+    expect(find.textContaining('PO-SENT-2'), findsOneWidget);
+    expect(find.textContaining('PO-SENT-3'), findsNothing);
+    expect(find.text('Status: Poslana'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('po-load-more')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('po-load-more')));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-SENT-3'), findsOneWidget);
+    expect(find.text('Status: Poslana'), findsOneWidget);
+  });
+
   testWidgets('logout removes persisted token', (tester) async {
     final harness = await _createHarness(
       savedToken: 'saved-token',

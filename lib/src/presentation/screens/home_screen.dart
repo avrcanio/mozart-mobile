@@ -180,6 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, state, _) => _PurchaseOrdersTab(
           state: state,
           onRetry: _loadAll,
+          onLoadMore: () => _purchaseOrdersController.loadMore(widget.session.token),
           onOpenFilters: () => _showPurchaseOrderFilters(state),
           onResetFilters: _resetPurchaseOrderFilters,
           onOrderChanged: _refreshPurchaseOrders,
@@ -687,6 +688,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
   const _PurchaseOrdersTab({
     required this.state,
     required this.onRetry,
+    required this.onLoadMore,
     required this.onOpenFilters,
     required this.onResetFilters,
     required this.onOrderChanged,
@@ -699,6 +701,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
 
   final PurchaseOrdersState state;
   final VoidCallback onRetry;
+  final Future<void> Function() onLoadMore;
   final VoidCallback onOpenFilters;
   final VoidCallback onResetFilters;
   final Future<void> Function() onOrderChanged;
@@ -841,6 +844,27 @@ class _PurchaseOrdersTab extends StatelessWidget {
             ),
           ),
         ),
+        if (state.loadMoreErrorMessage != null) ...[
+          const SizedBox(height: 8),
+          _ErrorBanner(message: state.loadMoreErrorMessage!),
+        ],
+        if (state.hasContent && state.hasMorePages) ...[
+          const SizedBox(height: 4),
+          Center(
+            child: FilledButton.tonal(
+              key: const Key('po-load-more'),
+              onPressed: state.isLoadingMore ? null : onLoadMore,
+              child: Text(
+                state.isLoadingMore ? 'Ucitavanje...' : 'Ucitaj jos',
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Prikazano ${state.orders.length} od ${state.totalCount} narudzbi.',
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
       ],
     );
 

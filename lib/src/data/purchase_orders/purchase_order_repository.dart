@@ -39,11 +39,16 @@ class PurchaseOrderRepository {
   Future<PurchaseOrderPage> fetchPurchaseOrdersPage({
     required String authToken,
     PurchaseOrderFilters filters = const PurchaseOrderFilters(),
+    int page = 1,
   }) async {
+    final queryParameters = <String, String>{
+      ...filters.toQueryParameters(),
+      if (page > 1) 'page': '$page',
+    };
     final json = await _apiClient.getJson(
       '/api/purchase-orders/',
       authToken: authToken,
-      queryParameters: filters.toQueryParameters(),
+      queryParameters: queryParameters,
     );
     final orders = (json['results'] as List<dynamic>? ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
@@ -60,12 +65,14 @@ class PurchaseOrderRepository {
   Future<List<PurchaseOrder>> fetchPurchaseOrders({
     required String authToken,
     PurchaseOrderFilters filters = const PurchaseOrderFilters(),
+    int page = 1,
   }) async {
-    final page = await fetchPurchaseOrdersPage(
+    final purchaseOrderPage = await fetchPurchaseOrdersPage(
       authToken: authToken,
       filters: filters,
+      page: page,
     );
-    return page.orders;
+    return purchaseOrderPage.orders;
   }
 
   Future<PurchaseOrder> fetchPurchaseOrderDetail({
