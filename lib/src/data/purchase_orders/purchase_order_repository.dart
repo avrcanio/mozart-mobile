@@ -10,17 +10,19 @@ import 'models/warehouse_dto.dart';
 
 class PurchaseOrderRepository {
   PurchaseOrderRepository({required ApiClient apiClient})
-      : _apiClient = apiClient;
+    : _apiClient = apiClient;
 
   final ApiClient _apiClient;
 
   Uri get listEndpoint => _apiClient.endpoint(path: '/api/purchase-orders/');
 
-  Uri detailEndpoint(int id) => _apiClient.endpoint(path: '/api/purchase-orders/$id/');
+  Uri detailEndpoint(int id) =>
+      _apiClient.endpoint(path: '/api/purchase-orders/$id/');
 
   Uri get suppliersEndpoint => _apiClient.endpoint(path: '/api/suppliers/');
 
-  Uri get paymentTypesEndpoint => _apiClient.endpoint(path: '/api/payment-types/');
+  Uri get paymentTypesEndpoint =>
+      _apiClient.endpoint(path: '/api/payment-types/');
 
   Uri get warehousesEndpoint => _apiClient.endpoint(path: '/api/warehouses/');
 
@@ -30,11 +32,15 @@ class PurchaseOrderRepository {
   Uri patchPriceEndpoint(int itemId) =>
       _apiClient.endpoint(path: '/api/purchase-order-items/$itemId/price/');
 
-  Uri warehouseInputsEndpoint(int orderId) =>
-      _apiClient.endpoint(path: '/api/purchase-orders/$orderId/warehouse-inputs/');
+  Uri warehouseInputsEndpoint(int orderId) => _apiClient.endpoint(
+    path: '/api/purchase-orders/$orderId/warehouse-inputs/',
+  );
 
   Uri sendEndpoint(int orderId) =>
       _apiClient.endpoint(path: '/api/purchase-orders/$orderId/send/');
+
+  Uri statusEndpoint(int orderId) =>
+      _apiClient.endpoint(path: '/api/purchase-orders/$orderId/status/');
 
   Future<PurchaseOrderPage> fetchPurchaseOrdersPage({
     required String authToken,
@@ -110,9 +116,7 @@ class PurchaseOrderRepository {
     return PurchaseOrderDto.fromJson(json).toDomain();
   }
 
-  Future<List<SupplierDto>> fetchSuppliers({
-    required String authToken,
-  }) async {
+  Future<List<SupplierDto>> fetchSuppliers({required String authToken}) async {
     final jsonList = await _apiClient.getJsonList(
       '/api/suppliers/',
       authToken: authToken,
@@ -189,6 +193,19 @@ class PurchaseOrderRepository {
       authToken: authToken,
       body: const <String, dynamic>{},
     );
+  }
+
+  Future<PurchaseOrder> updatePurchaseOrderStatus({
+    required int orderId,
+    required String status,
+    required String authToken,
+  }) async {
+    final json = await _apiClient.postJson(
+      '/api/purchase-orders/$orderId/status/',
+      authToken: authToken,
+      body: <String, dynamic>{'status': status},
+    );
+    return PurchaseOrderDto.fromJson(json).toDomain();
   }
 
   Future<List<SupplierArticleDto>> fetchSupplierArticles({

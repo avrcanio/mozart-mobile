@@ -8,6 +8,7 @@ class PurchaseOrderDetailState {
   const PurchaseOrderDetailState({
     required this.isLoading,
     required this.isSending,
+    required this.isUpdatingStatus,
     required this.isUpdatingPrice,
     required this.activePriceItemId,
     required this.order,
@@ -17,17 +18,19 @@ class PurchaseOrderDetailState {
   });
 
   const PurchaseOrderDetailState.initial()
-      : isLoading = false,
-        isSending = false,
-        isUpdatingPrice = false,
-        activePriceItemId = null,
-        order = null,
-        errorMessage = null,
-        actionMessage = null,
-        actionErrorMessage = null;
+    : isLoading = false,
+      isSending = false,
+      isUpdatingStatus = false,
+      isUpdatingPrice = false,
+      activePriceItemId = null,
+      order = null,
+      errorMessage = null,
+      actionMessage = null,
+      actionErrorMessage = null;
 
   final bool isLoading;
   final bool isSending;
+  final bool isUpdatingStatus;
   final bool isUpdatingPrice;
   final int? activePriceItemId;
   final PurchaseOrder? order;
@@ -40,6 +43,7 @@ class PurchaseOrderDetailState {
   PurchaseOrderDetailState copyWith({
     bool? isLoading,
     bool? isSending,
+    bool? isUpdatingStatus,
     bool? isUpdatingPrice,
     int? activePriceItemId,
     PurchaseOrder? order,
@@ -53,12 +57,14 @@ class PurchaseOrderDetailState {
     return PurchaseOrderDetailState(
       isLoading: isLoading ?? this.isLoading,
       isSending: isSending ?? this.isSending,
+      isUpdatingStatus: isUpdatingStatus ?? this.isUpdatingStatus,
       isUpdatingPrice: isUpdatingPrice ?? this.isUpdatingPrice,
       activePriceItemId: activePriceItemId ?? this.activePriceItemId,
       order: order ?? this.order,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      actionMessage:
-          clearActionMessage ? null : (actionMessage ?? this.actionMessage),
+      actionMessage: clearActionMessage
+          ? null
+          : (actionMessage ?? this.actionMessage),
       actionErrorMessage: clearActionError
           ? null
           : (actionErrorMessage ?? this.actionErrorMessage),
@@ -69,15 +75,12 @@ class PurchaseOrderDetailState {
 class PurchaseOrderDetailController
     extends ValueNotifier<PurchaseOrderDetailState> {
   PurchaseOrderDetailController({required PurchaseOrderRepository repository})
-      : _repository = repository,
-        super(const PurchaseOrderDetailState.initial());
+    : _repository = repository,
+      super(const PurchaseOrderDetailState.initial());
 
   final PurchaseOrderRepository _repository;
 
-  Future<void> load({
-    required int id,
-    required String authToken,
-  }) async {
+  Future<void> load({required int id, required String authToken}) async {
     value = value.copyWith(
       isLoading: true,
       clearError: true,
@@ -89,11 +92,7 @@ class PurchaseOrderDetailController
         id: id,
         authToken: authToken,
       );
-      value = value.copyWith(
-        isLoading: false,
-        order: order,
-        clearError: true,
-      );
+      value = value.copyWith(isLoading: false, order: order, clearError: true);
     } catch (_) {
       value = value.copyWith(
         isLoading: false,
@@ -103,20 +102,14 @@ class PurchaseOrderDetailController
     }
   }
 
-  Future<bool> send({
-    required int id,
-    required String authToken,
-  }) async {
+  Future<bool> send({required int id, required String authToken}) async {
     value = value.copyWith(
       isSending: true,
       clearActionMessage: true,
       clearActionError: true,
     );
     try {
-      await _repository.sendPurchaseOrder(
-        orderId: id,
-        authToken: authToken,
-      );
+      await _repository.sendPurchaseOrder(orderId: id, authToken: authToken);
       final order = await _repository.fetchPurchaseOrderDetail(
         id: id,
         authToken: authToken,
@@ -186,6 +179,55 @@ class PurchaseOrderDetailController
         actionErrorMessage: 'Promjena cijene nije uspjela. Pokušajte ponovno.',
       );
       return false;
+    }
+  }
+
+  Future<bool> updateStatus({
+    required int id,
+    required String status,
+    required String authToken,
+  }) async {
+    value = value.copyWith(
+      isUpdatingStatus: true,
+      clearActionMessage: true,
+      clearActionError: true,
+    );
+    try {
+      final order = await _repository.updatePurchaseOrderStatus(
+        orderId: id,
+        status: status,
+        authToken: authToken,
+      );
+      value = value.copyWith(
+        isUpdatingStatus: false,
+        order: order,
+        actionMessage: _statusSuccessMessage(status),
+        clearActionError: true,
+      );
+      return true;
+    } on ApiException catch (error) {
+      value = value.copyWith(
+        isUpdatingStatus: false,
+        actionErrorMessage: error.message,
+      );
+      return false;
+    } catch (_) {
+      value = value.copyWith(
+        isUpdatingStatus: false,
+        actionErrorMessage: 'Promjena statusa nije uspjela. Pokušajte ponovno.',
+      );
+      return false;
+    }
+  }
+
+  String _statusSuccessMessage(String status) {
+    switch (status) {
+      case 'confirmed':
+        return 'Narudžba je uspješno potvrđena.';
+      case 'received_all':
+        return 'Narudžba je označena kao sve zaprimljeno.';
+      default:
+        return 'Status narudžbe je uspješno ažuriran.';
     }
   }
 }

@@ -26,17 +26,15 @@ class PurchaseOrderDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detalji narud\u017Ebe'),
-      ),
+      appBar: AppBar(title: const Text('Detalji narud\u017Ebe')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-            child: PurchaseOrderDetailPane(
-              orderId: orderId,
-              session: session,
-              repository: repository,
-              onOrderChanged: onOrderChanged,
+          child: PurchaseOrderDetailPane(
+            orderId: orderId,
+            session: session,
+            repository: repository,
+            onOrderChanged: onOrderChanged,
           ),
         ),
       ),
@@ -61,7 +59,8 @@ class PurchaseOrderDetailPane extends StatefulWidget {
   final Future<void> Function()? onOrderChanged;
 
   @override
-  State<PurchaseOrderDetailPane> createState() => _PurchaseOrderDetailPaneState();
+  State<PurchaseOrderDetailPane> createState() =>
+      _PurchaseOrderDetailPaneState();
 }
 
 class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
@@ -102,6 +101,42 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
     }
   }
 
+  Future<void> _openStatusChange(PurchaseOrder order) async {
+    final target = _statusTransitionTargetFor(order);
+    if (target == null) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        final bottomSheetNavigator = Navigator.of(context);
+        return ValueListenableBuilder<PurchaseOrderDetailState>(
+          valueListenable: _controller,
+          builder: (context, state, _) => _StatusChangeSheet(
+            target: target,
+            isSubmitting: state.isUpdatingStatus,
+            onConfirm: () async {
+              final changed = await _controller.updateStatus(
+                id: widget.orderId,
+                status: target.status,
+                authToken: widget.session.token,
+              );
+              if (!mounted || !changed) {
+                return;
+              }
+              bottomSheetNavigator.pop();
+              if (widget.onOrderChanged != null) {
+                await widget.onOrderChanged!();
+              }
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _openEdit(PurchaseOrder order) async {
     final updated = await Navigator.of(context).push<PurchaseOrder>(
       MaterialPageRoute<PurchaseOrder>(
@@ -139,19 +174,22 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Zaprimanje robe je uspje\u0161no spremljeno.')),
+        const SnackBar(
+          content: Text('Zaprimanje robe je uspje\u0161no spremljeno.'),
+        ),
       );
     }
   }
 
-  Future<void> _openPriceAudit(PurchaseOrder order, PurchaseOrderLine line) async {
+  Future<void> _openPriceAudit(
+    PurchaseOrder order,
+    PurchaseOrderLine line,
+  ) async {
     final result = await showModalBottomSheet<_PriceAuditSubmission>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _PriceAuditSheet(
-        line: line,
-        currency: order.currency,
-      ),
+      builder: (context) =>
+          _PriceAuditSheet(line: line, currency: order.currency),
     );
     if (result == null) {
       return;
@@ -190,6 +228,7 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
               state: state,
               onRetry: _load,
               onSend: _send,
+              onChangeStatus: _openStatusChange,
               onEdit: _openEdit,
               onReceive: _openReceipt,
               onPriceAudit: _openPriceAudit,
@@ -206,6 +245,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
     required this.state,
     required this.onRetry,
     required this.onSend,
+    required this.onChangeStatus,
     required this.onEdit,
     required this.onReceive,
     required this.onPriceAudit,
@@ -214,10 +254,11 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
   final PurchaseOrderDetailState state;
   final VoidCallback onRetry;
   final Future<void> Function() onSend;
+  final Future<void> Function(PurchaseOrder order) onChangeStatus;
   final Future<void> Function(PurchaseOrder order) onEdit;
   final Future<void> Function(PurchaseOrder order) onReceive;
   final Future<void> Function(PurchaseOrder order, PurchaseOrderLine line)
-      onPriceAudit;
+  onPriceAudit;
 
   @override
   Widget build(BuildContext context) {
@@ -258,6 +299,8 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
     }
 
     final order = state.order!;
+    final statusTarget = _statusTransitionTargetFor(order);
+    final canReceive = _canReceivePurchaseOrder(order);
 
     return ListView(
       children: [
@@ -270,8 +313,8 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                 color: Theme.of(context).colorScheme.error,
                 fontWeight: FontWeight.w600,
               ),
-              ),
             ),
+          ),
         if (state.actionMessage != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -315,16 +358,36 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.send),
-                  label: Text(state.isSending ? 'Slanje...' : 'Pošalji narudžbu'),
+                  label: Text(
+                    state.isSending ? 'Slanje...' : 'Pošalji narudžbu',
+                  ),
                 ),
-                const SizedBox(width: 12),
+                if (statusTarget != null)
+                  OutlinedButton.icon(
+                    key: const Key('po-detail-change-status'),
+                    onPressed: state.isUpdatingStatus
+                        ? null
+                        : () => onChangeStatus(order),
+                    icon: state.isUpdatingStatus
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.swap_horiz_outlined),
+                    label: Text(
+                      state.isUpdatingStatus
+                          ? 'Promjena...'
+                          : 'Promijeni status',
+                    ),
+                  ),
                 if (!order.isLockedForEditing)
                   OutlinedButton.icon(
                     onPressed: () => onEdit(order),
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Uredi'),
                   ),
-                if (order.remainingQuantity > 0)
+                if (canReceive)
                   OutlinedButton.icon(
                     onPressed: () => onReceive(order),
                     icon: const Icon(Icons.warehouse_outlined),
@@ -340,13 +403,32 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               children: [
+                if (statusTarget != null)
+                  OutlinedButton.icon(
+                    key: const Key('po-detail-change-status'),
+                    onPressed: state.isUpdatingStatus
+                        ? null
+                        : () => onChangeStatus(order),
+                    icon: state.isUpdatingStatus
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.swap_horiz_outlined),
+                    label: Text(
+                      state.isUpdatingStatus
+                          ? 'Promjena...'
+                          : 'Promijeni status',
+                    ),
+                  ),
                 if (!order.isLockedForEditing)
                   OutlinedButton.icon(
                     onPressed: () => onEdit(order),
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Uredi'),
                   ),
-                if (order.remainingQuantity > 0)
+                if (canReceive)
                   OutlinedButton.icon(
                     onPressed: () => onReceive(order),
                     icon: const Icon(Icons.warehouse_outlined),
@@ -361,8 +443,10 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Narud\u017Eba ${order.reference}',
-                    style: Theme.of(context).textTheme.headlineSmall),
+                Text(
+                  'Narud\u017Eba ${order.reference}',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'Pregled osnovnih podataka i statusa narud\u017Ebe.',
@@ -372,23 +456,14 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                 _DetailRow(label: '\u0160ifra', value: '#${order.id}'),
                 _DetailRow(label: 'Referenca', value: order.reference),
                 _DetailRow(label: 'Dobavlja\u010D', value: order.supplierName),
-                _DetailRow(
-                  label: 'Status',
-                  value: order.statusLabel,
-                ),
-                _DetailRow(
-                  label: 'Placanje',
-                  value: order.paymentTypeName,
-                ),
+                _DetailRow(label: 'Status', value: order.statusLabel),
+                _DetailRow(label: 'Placanje', value: order.paymentTypeName),
                 _DetailRow(
                   label: 'Datum',
                   value: _formatDate(order.orderedAt, dateFormat),
                 ),
                 if (order.createdBy.isNotEmpty)
-                  _DetailRow(
-                    label: 'Kreirao',
-                    value: order.createdBy,
-                  ),
+                  _DetailRow(label: 'Kreirao', value: order.createdBy),
               ],
             ),
           ),
@@ -442,7 +517,11 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                 const SizedBox(height: 14),
                 _DetailRow(
                   label: 'Neto',
-                  value: _formatMoney(order.totalNetAmount, order.currency, currencyFormat),
+                  value: _formatMoney(
+                    order.totalNetAmount,
+                    order.currency,
+                    currencyFormat,
+                  ),
                 ),
                 _DetailRow(
                   label: 'Bruto',
@@ -482,10 +561,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Stavke',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+                Text('Stavke', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 14),
                 if (order.lines.isEmpty)
                   const Text('Narud\u017Eba trenutno nema stavki.')
@@ -516,10 +592,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({
-    required this.label,
-    required this.value,
-  });
+  const _DetailRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -535,9 +608,9 @@ class _DetailRow extends StatelessWidget {
             width: 96,
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           Expanded(child: Text(value)),
@@ -586,10 +659,15 @@ class _LineItemCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Kolicina: ${_formatQuantity(line.quantity, numberFormat)} ${line.unitName}'.trim(),
+            'Kolicina: ${_formatQuantity(line.quantity, numberFormat)} ${line.unitName}'
+                .trim(),
           ),
-          Text('Zaprimljeno: ${_formatQuantity(line.receivedQuantity, numberFormat)}'),
-          Text('Preostalo: ${_formatQuantity(line.remainingQuantity, numberFormat)}'),
+          Text(
+            'Zaprimljeno: ${_formatQuantity(line.receivedQuantity, numberFormat)}',
+          ),
+          Text(
+            'Preostalo: ${_formatQuantity(line.remainingQuantity, numberFormat)}',
+          ),
           Text(
             'Cijena: ${_formatMoney(line.unitPrice, currency, currencyFormat)}',
           ),
@@ -619,10 +697,7 @@ class _LineItemCard extends StatelessWidget {
 }
 
 class _HistoryEntryTile extends StatelessWidget {
-  const _HistoryEntryTile({
-    required this.entry,
-    required this.dateFormat,
-  });
+  const _HistoryEntryTile({required this.entry, required this.dateFormat});
 
   final PurchaseOrderHistoryEntry entry;
   final DateFormat dateFormat;
@@ -672,16 +747,84 @@ class _HistoryEntryTile extends StatelessWidget {
 }
 
 class _PriceAuditSheet extends StatefulWidget {
-  const _PriceAuditSheet({
-    required this.line,
-    required this.currency,
-  });
+  const _PriceAuditSheet({required this.line, required this.currency});
 
   final PurchaseOrderLine line;
   final String currency;
 
   @override
   State<_PriceAuditSheet> createState() => _PriceAuditSheetState();
+}
+
+class _StatusChangeTarget {
+  const _StatusChangeTarget({
+    required this.status,
+    required this.title,
+    required this.description,
+    required this.confirmLabel,
+  });
+
+  final String status;
+  final String title;
+  final String description;
+  final String confirmLabel;
+}
+
+class _StatusChangeSheet extends StatelessWidget {
+  const _StatusChangeSheet({
+    required this.target,
+    required this.isSubmitting,
+    required this.onConfirm,
+  });
+
+  final _StatusChangeTarget target;
+  final bool isSubmitting;
+  final Future<void> Function() onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final insets = MediaQuery.of(context).viewInsets.bottom;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + insets),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              target.title,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              target.description,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                  child: const Text('Odustani'),
+                ),
+                const Spacer(),
+                FilledButton(
+                  key: const Key('po-status-change-confirm'),
+                  onPressed: isSubmitting ? null : onConfirm,
+                  child: Text(
+                    isSubmitting ? 'Spremanje...' : target.confirmLabel,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _PriceAuditSheetState extends State<_PriceAuditSheet> {
@@ -772,55 +915,56 @@ class _PriceAuditSheetState extends State<_PriceAuditSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                Text(
-                  'Korekcija cijene',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${widget.line.articleName} | Trenutno ${widget.currency} $currentPrice',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  key: const Key('po-price-audit-price'),
-                  controller: _priceController,
-                  decoration: InputDecoration(
-                    labelText: 'Nova cijena (${widget.currency})',
+                  Text(
+                    'Korekcija cijene',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (_) => setState(() {}),
-                  validator: (value) {
-                    final parsed = _parseLocalizedDecimal(value ?? '');
-                    if (parsed == null || parsed <= 0) {
-                      return 'Unesite ispravnu cijenu.';
-                    }
-                    if (parsed == widget.line.unitPrice) {
-                      return 'Unesite novu cijenu razlicitu od postojece.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  key: const Key('po-price-audit-reason'),
-                  controller: _reasonController,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Razlog promjene',
-                    hintText: 'Navedite zasto mijenjate cijenu stavke.',
+                  const SizedBox(height: 8),
+                  Text(
+                    '${widget.line.articleName} | Trenutno ${widget.currency} $currentPrice',
+                    style: Theme.of(context).textTheme.bodyLarge,
                   ),
-                  onChanged: (_) => setState(() {}),
-                  validator: (value) {
-                    if ((value ?? '').trim().isEmpty) {
-                      return 'Unesite razlog promjene.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    key: const Key('po-price-audit-price'),
+                    controller: _priceController,
+                    decoration: InputDecoration(
+                      labelText: 'Nova cijena (${widget.currency})',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    validator: (value) {
+                      final parsed = _parseLocalizedDecimal(value ?? '');
+                      if (parsed == null || parsed <= 0) {
+                        return 'Unesite ispravnu cijenu.';
+                      }
+                      if (parsed == widget.line.unitPrice) {
+                        return 'Unesite novu cijenu razlicitu od postojece.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    key: const Key('po-price-audit-reason'),
+                    controller: _reasonController,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Razlog promjene',
+                      hintText: 'Navedite zasto mijenjate cijenu stavke.',
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    validator: (value) {
+                      if ((value ?? '').trim().isEmpty) {
+                        return 'Unesite razlog promjene.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       TextButton(
@@ -846,10 +990,7 @@ class _PriceAuditSheetState extends State<_PriceAuditSheet> {
 }
 
 class _PriceAuditDraftSnapshot {
-  const _PriceAuditDraftSnapshot({
-    required this.price,
-    required this.reason,
-  });
+  const _PriceAuditDraftSnapshot({required this.price, required this.reason});
 
   final String price;
   final String reason;
@@ -869,10 +1010,7 @@ class _PriceAuditDraftSnapshot {
 }
 
 class _PriceAuditSubmission {
-  const _PriceAuditSubmission({
-    required this.price,
-    required this.reason,
-  });
+  const _PriceAuditSubmission({required this.price, required this.reason});
 
   final String price;
   final String reason;
@@ -923,10 +1061,7 @@ class _DetailStateCard extends StatelessWidget {
             Text(message, style: theme.textTheme.bodyLarge),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: onAction,
-                child: Text(actionLabel!),
-              ),
+              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
             ],
           ],
         ),
@@ -968,4 +1103,53 @@ double? _parseLocalizedDecimal(String value) {
 
 String _normalizeDecimalString(String value) {
   return value.trim().replaceAll(',', '.');
+}
+
+_StatusChangeTarget? _statusTransitionTargetFor(PurchaseOrder order) {
+  switch (_normalizeStatusValue(order.status)) {
+    case 'created':
+    case 'sent':
+      return const _StatusChangeTarget(
+        status: 'confirmed',
+        title: 'Promijeni status u Potvrđena',
+        description:
+            'Potvrdite promjenu statusa. Narudžba će prijeći u potvrđeni status.',
+        confirmLabel: 'Potvrdi narudžbu',
+      );
+    case 'received':
+      return const _StatusChangeTarget(
+        status: 'received_all',
+        title: 'Označi kao sve zaprimljeno',
+        description:
+            'Potvrdite promjenu statusa. Narudžba će prijeći u status "Sve stavke s narudžbe su zaprimljene".',
+        confirmLabel: 'Označi kao zaprimljeno',
+      );
+    default:
+      return null;
+  }
+}
+
+String _normalizeStatusValue(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll('č', 'c')
+      .replaceAll('ć', 'c')
+      .replaceAll('ž', 'z')
+      .replaceAll('š', 's')
+      .replaceAll('đ', 'd');
+}
+
+bool _canReceivePurchaseOrder(PurchaseOrder order) {
+  if (order.remainingQuantity <= 0) {
+    return false;
+  }
+
+  switch (_normalizeStatusValue(order.status)) {
+    case 'confirmed':
+    case 'received':
+      return true;
+    default:
+      return false;
+  }
 }
