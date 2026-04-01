@@ -18,7 +18,9 @@ import 'package:mozart_mobile/src/presentation/app_services_scope.dart';
 import 'package:mozart_mobile/src/presentation/app_view.dart';
 import 'package:mozart_mobile/src/presentation/connectivity_feedback.dart';
 import 'package:mozart_mobile/src/presentation/screens/mailbox_detail_screen.dart';
+import 'package:mozart_mobile/src/presentation/screens/purchase_order_detail_screen.dart';
 import 'package:mozart_mobile/src/presentation/session_scope.dart';
+import 'package:mozart_mobile/src/presentation/screens/purchase_order_receipt_screen.dart';
 import 'package:mozart_mobile/src/presentation/screens/purchase_order_form_screen.dart';
 
 void main() {
@@ -1803,6 +1805,286 @@ void main() {
 
     expect(find.text('Sign in'), findsOneWidget);
     expect(await harness.storage.readToken(), isNull);
+  });
+
+  testWidgets('warns before discarding unsaved purchase order form changes', (
+    tester,
+  ) async {
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+          ]),
+          'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 5, 'name': 'Virman'},
+          ]),
+          'GET /api/suppliers/2/artikli/': _jsonListResponse(
+            <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 77,
+                'artikl_name': 'Coffee beans',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.50',
+              },
+            ],
+          ),
+        }),
+      ),
+    );
+    const initialOrder = PurchaseOrder(
+      id: 44,
+      reference: 'PO-EDIT',
+      supplierId: 2,
+      status: 'created',
+      statusLabel: 'Kreirana',
+      supplierName: 'Blue Harbor Supply',
+      paymentTypeId: 5,
+      paymentTypeName: 'Virman',
+      totalAmount: 130,
+      currency: 'EUR',
+      orderedAt: null,
+      lines: <PurchaseOrderLine>[
+        PurchaseOrderLine(
+          id: 7,
+          articleId: 77,
+          articleName: 'Coffee beans',
+          unitOfMeasureId: 1,
+          unitName: 'kg',
+          baseGroup: '',
+          quantity: 4,
+          receivedQuantity: 0,
+          remainingQuantity: 4,
+          unitPrice: 13,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildMozartTheme(),
+        home: PurchaseOrderFormScreen(
+          session: session,
+          repository: repository,
+          initialOrder: initialOrder,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('po-line-0-quantity')), '5');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Odbaciti promjene?'), findsOneWidget);
+
+    await tester.tap(find.text('Nastavi uredjivati'));
+    await tester.pumpAndSettle();
+    expect(find.text('Uredi narudzbu'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Odbaci promjene'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Uredi narudzbu'), findsNothing);
+  });
+
+  testWidgets('warns before discarding unsaved warehouse receipt changes', (
+    tester,
+  ) async {
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/warehouses/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 9, 'name': 'Central Warehouse'},
+          ]),
+        }),
+      ),
+    );
+    const order = PurchaseOrder(
+      id: 88,
+      reference: 'PO-88',
+      supplierId: 2,
+      status: 'sent',
+      statusLabel: 'Poslana',
+      supplierName: 'Blue Harbor Supply',
+      paymentTypeId: 5,
+      paymentTypeName: 'Virman',
+      totalAmount: 120,
+      currency: 'EUR',
+      orderedAt: null,
+      lines: <PurchaseOrderLine>[
+        PurchaseOrderLine(
+          id: 11,
+          articleId: 77,
+          articleName: 'Coffee beans',
+          unitOfMeasureId: 1,
+          unitName: 'kg',
+          baseGroup: '',
+          quantity: 10,
+          receivedQuantity: 0,
+          remainingQuantity: 10,
+          unitPrice: 12,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildMozartTheme(),
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => PurchaseOrderReceiptScreen(
+                        order: order,
+                        session: session,
+                        repository: repository,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open receipt'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open receipt'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-receipt-invoice-code')),
+      'INV-2026-001',
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Odbaciti promjene?'), findsOneWidget);
+
+    await tester.tap(find.text('Nastavi uredjivati'));
+    await tester.pumpAndSettle();
+    expect(find.text('Zaprimanje robe'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Odbaci promjene'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Zaprimanje robe'), findsNothing);
+    expect(find.text('Open receipt'), findsOneWidget);
+  });
+
+  testWidgets('warns before discarding unsaved price audit changes', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/purchase-orders/2049/': _jsonResponse(<String, dynamic>{
+            'id': 2049,
+            'reference': 'PO-2049',
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'sent',
+            'status_display': 'Poslana',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-02T11:30:00Z',
+            'currency': 'EUR',
+            'total_net': '96.00',
+            'total_gross': '120.00',
+            'items': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 8,
+                'artikl': 77,
+                'artikl_name': 'Coffee beans',
+                'quantity': '10.0000',
+                'received_quantity': '0.0000',
+                'remaining_quantity': '10.0000',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.00',
+                'base_group': '',
+              },
+            ],
+          }),
+        }),
+      ),
+    );
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildMozartTheme(),
+        home: PurchaseOrderDetailScreen(
+          orderId: 2049,
+          session: session,
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Korigiraj cijenu'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(
+      find.widgetWithText(OutlinedButton, 'Korigiraj cijenu'),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-price-audit-price')),
+      '13,50',
+    );
+    await tester.tap(find.text('Odustani'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Odbaciti promjene?'), findsOneWidget);
+
+    await tester.tap(find.text('Nastavi uredjivati'));
+    await tester.pumpAndSettle();
+    expect(find.text('Korekcija cijene'), findsOneWidget);
+
+    await tester.tap(find.text('Odustani'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Odbaci promjene'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Korekcija cijene'), findsNothing);
   });
 
   test('uses backend logout invalidation when a logout endpoint is configured', () async {

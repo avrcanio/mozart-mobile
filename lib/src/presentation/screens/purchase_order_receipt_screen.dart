@@ -6,6 +6,7 @@ import '../../data/purchase_orders/purchase_order_repository.dart';
 import '../../domain/purchase_order.dart';
 import '../../domain/user_session.dart';
 import '../../domain/warehouse_option.dart';
+import '../unsaved_changes_guard.dart';
 
 class PurchaseOrderReceiptScreen extends StatefulWidget {
   const PurchaseOrderReceiptScreen({
@@ -37,6 +38,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
   int? _selectedWarehouseId;
   List<WarehouseOption> _warehouses = const <WarehouseOption>[];
   late final List<_ReceiptLine> _lines;
+  late _ReceiptDraftSnapshot _initialSnapshot;
 
   @override
   void initState() {
@@ -46,6 +48,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
         .where((line) => line.id > 0 && line.remainingQuantity > 0)
         .map(_ReceiptLine.fromOrderLine)
         .toList();
+    _initialSnapshot = _buildSnapshot();
     _loadWarehouses();
   }
 
@@ -77,6 +80,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
         _selectedWarehouseId = warehouses.isNotEmpty ? warehouses.first.id : null;
         _isLoading = false;
       });
+      _initialSnapshot = _buildSnapshot();
     } catch (_) {
       if (!mounted) {
         return;
@@ -154,6 +158,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
       if (!mounted) {
         return;
       }
+      _initialSnapshot = _buildSnapshot();
       Navigator.of(context).pop(true);
     } on ApiException catch (error) {
       if (!mounted) {
@@ -174,19 +179,61 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
     }
   }
 
+  _ReceiptDraftSnapshot _buildSnapshot() {
+    return _ReceiptDraftSnapshot(
+      documentDate: _formatDate(_documentDate),
+      warehouseId: _selectedWarehouseId,
+      invoiceCode: _invoiceCodeController.text.trim(),
+      deliveryNote: _deliveryNoteController.text.trim(),
+      lineQuantities: _lines
+          .map((line) => _normalizeDecimal(line.quantityController.text))
+          .toList(),
+    );
+  }
+
+  bool get _hasUnsavedChanges => _buildSnapshot() != _initialSnapshot;
+
+  Future<void> _handlePopAttempt() async {
+    if (_isSubmitting || !_hasUnsavedChanges) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final shouldDiscard = await showDiscardChangesDialog(
+      context,
+      message:
+          'Imate nespremljene podatke zaprimanja. Ako izadete sada, unesene kolicine i dokumenti ce biti izgubljeni.',
+    );
+    if (!mounted || !shouldDiscard) {
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Zaprimanje robe')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Form(
-                  key: _formKey,
-                  child: ListView(
-                    children: [
+    return PopScope(
+      canPop: _isSubmitting || !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) {
+          return;
+        }
+        await _handlePopAttempt();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Zaprimanje robe'),
+          leading: BackButton(onPressed: _handlePopAttempt),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Form(
+                    key: _formKey,
+                    child: ListView(
+                      children: [
                       Text(
                         'Zaprimanje za ${widget.order.reference}',
                         style: Theme.of(context).textTheme.headlineSmall,
@@ -254,6 +301,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
                         decoration: const InputDecoration(
                           labelText: 'Broj racuna',
                         ),
+                        onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: 14),
                       TextFormField(
@@ -262,6 +310,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
                         decoration: const InputDecoration(
                           labelText: 'Otpremnica',
                         ),
+                        onChanged: (_) => setState(() {}),
                       ),
                       const SizedBox(height: 18),
                       Text(
@@ -278,6 +327,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
                                 child: _ReceiptLineCard(
                                   index: entry.key,
                                   line: entry.value,
+                                  onChanged: () => setState(() {}),
                                 ),
                               ),
                             ),
@@ -289,9 +339,10 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
                           _isSubmitting ? 'Spremanje...' : 'Potvrdi zaprimanje',
                         ),
                       ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
     );
@@ -302,10 +353,12 @@ class _ReceiptLineCard extends StatelessWidget {
   const _ReceiptLineCard({
     required this.index,
     required this.line,
+    required this.onChanged,
   });
 
   final int index;
   final _ReceiptLine line;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +383,7 @@ class _ReceiptLineCard extends StatelessWidget {
                 labelText: 'Zaprimljeno (${line.unitName})',
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              onChanged: (_) => onChanged(),
               validator: (value) {
                 final parsed = _parseDecimal(value ?? '');
                 if (parsed == null) {
@@ -397,12 +451,54 @@ class _ReceiptLine {
   }
 }
 
+class _ReceiptDraftSnapshot {
+  const _ReceiptDraftSnapshot({
+    required this.documentDate,
+    required this.warehouseId,
+    required this.invoiceCode,
+    required this.deliveryNote,
+    required this.lineQuantities,
+  });
+
+  final String documentDate;
+  final int? warehouseId;
+  final String invoiceCode;
+  final String deliveryNote;
+  final List<String> lineQuantities;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is _ReceiptDraftSnapshot &&
+        other.documentDate == documentDate &&
+        other.warehouseId == warehouseId &&
+        other.invoiceCode == invoiceCode &&
+        other.deliveryNote == deliveryNote &&
+        _listEquals(other.lineQuantities, lineQuantities);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        documentDate,
+        warehouseId,
+        invoiceCode,
+        deliveryNote,
+        Object.hashAll(lineQuantities),
+      );
+}
+
 double? _parseDecimal(String value) {
-  final normalized = value.trim().replaceAll(',', '.');
+  final normalized = _normalizeDecimal(value);
   if (normalized.isEmpty) {
     return null;
   }
   return double.tryParse(normalized);
+}
+
+String _normalizeDecimal(String value) {
+  return value.trim().replaceAll(',', '.');
 }
 
 String _formatDate(DateTime value) {
@@ -414,4 +510,16 @@ String _formatQuantity(double value) {
     return value.toInt().toString();
   }
   return value.toStringAsFixed(2);
+}
+
+bool _listEquals<T>(List<T> left, List<T> right) {
+  if (left.length != right.length) {
+    return false;
+  }
+  for (var index = 0; index < left.length; index += 1) {
+    if (left[index] != right[index]) {
+      return false;
+    }
+  }
+  return true;
 }

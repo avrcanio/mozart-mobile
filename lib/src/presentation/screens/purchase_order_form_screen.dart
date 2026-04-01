@@ -8,6 +8,7 @@ import '../../data/purchase_orders/models/supplier_dto.dart';
 import '../../data/purchase_orders/purchase_order_repository.dart';
 import '../../domain/purchase_order.dart';
 import '../../domain/user_session.dart';
+import '../unsaved_changes_guard.dart';
 
 class PurchaseOrderFormScreen extends StatefulWidget {
   const PurchaseOrderFormScreen({
@@ -45,6 +46,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
   int? _selectedPaymentTypeId;
   DateTime? _orderedAt;
   late List<_EditableOrderLine> _lines;
+  late _PurchaseOrderDraftSnapshot _initialSnapshot;
 
   @override
   void initState() {
@@ -57,6 +59,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     _selectedPaymentTypeId = widget.initialOrder?.paymentTypeId;
     _orderedAt = widget.initialOrder?.orderedAt ?? DateTime.now();
     _dateController.text = _formatDateInput(_orderedAt);
+    _initialSnapshot = _buildSnapshot();
     _loadLookups();
   }
 
@@ -226,6 +229,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       if (!mounted) {
         return;
       }
+      _initialSnapshot = _buildSnapshot();
       Navigator.of(context).pop(order);
     } on ApiException catch (error) {
       if (!mounted) {
@@ -248,28 +252,63 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     }
   }
 
+  _PurchaseOrderDraftSnapshot _buildSnapshot() {
+    return _PurchaseOrderDraftSnapshot(
+      supplierId: _selectedSupplierId,
+      paymentTypeId: _selectedPaymentTypeId,
+      orderedAt: _formatDateInput(_orderedAt),
+      lines: _lines.map(_EditableOrderLineSnapshot.fromLine).toList(),
+    );
+  }
+
+  bool get _hasUnsavedChanges => _buildSnapshot() != _initialSnapshot;
+
+  Future<void> _handlePopAttempt() async {
+    if (_isSubmitting || !_hasUnsavedChanges) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final shouldDiscard = await showDiscardChangesDialog(context);
+    if (!mounted || !shouldDiscard) {
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = widget.isEditing ? 'Uredi narudzbu' : 'Nova narudzba';
 
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      floatingActionButton: _selectedSupplierId == null
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _articles.isEmpty ? null : _addLine,
-              icon: const Icon(Icons.add),
-              label: const Text('Dodaj stavku'),
-            ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Form(
-                  key: _formKey,
-                  child: ListView(
-                    children: [
+    return PopScope(
+      canPop: _isSubmitting || !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) {
+          return;
+        }
+        await _handlePopAttempt();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(title),
+          leading: BackButton(onPressed: _handlePopAttempt),
+        ),
+        floatingActionButton: _selectedSupplierId == null
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: _articles.isEmpty ? null : _addLine,
+                icon: const Icon(Icons.add),
+                label: const Text('Dodaj stavku'),
+              ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Form(
+                    key: _formKey,
+                    child: ListView(
+                      children: [
                       if (_errorMessage != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 16),
@@ -395,9 +434,10 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                           _isSubmitting ? 'Spremanje...' : 'Spremi narudzbu',
                         ),
                       ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+          ),
         ),
       ),
     );
@@ -682,6 +722,82 @@ class _EditableOrderLine {
   }
 }
 
+class _PurchaseOrderDraftSnapshot {
+  const _PurchaseOrderDraftSnapshot({
+    required this.supplierId,
+    required this.paymentTypeId,
+    required this.orderedAt,
+    required this.lines,
+  });
+
+  final int? supplierId;
+  final int? paymentTypeId;
+  final String orderedAt;
+  final List<_EditableOrderLineSnapshot> lines;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is _PurchaseOrderDraftSnapshot &&
+        other.supplierId == supplierId &&
+        other.paymentTypeId == paymentTypeId &&
+        other.orderedAt == orderedAt &&
+        _listEquals(other.lines, lines);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        supplierId,
+        paymentTypeId,
+        orderedAt,
+        Object.hashAll(lines),
+      );
+}
+
+class _EditableOrderLineSnapshot {
+  const _EditableOrderLineSnapshot({
+    required this.id,
+    required this.articleId,
+    required this.unitOfMeasureId,
+    required this.quantity,
+    required this.price,
+  });
+
+  final int? id;
+  final int articleId;
+  final int unitOfMeasureId;
+  final String quantity;
+  final String price;
+
+  factory _EditableOrderLineSnapshot.fromLine(_EditableOrderLine line) {
+    return _EditableOrderLineSnapshot(
+      id: line.id,
+      articleId: line.articleId,
+      unitOfMeasureId: line.unitOfMeasureId,
+      quantity: _normalizeDecimalString(line.quantityText),
+      price: _normalizeDecimalString(line.priceText),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is _EditableOrderLineSnapshot &&
+        other.id == id &&
+        other.articleId == articleId &&
+        other.unitOfMeasureId == unitOfMeasureId &&
+        other.quantity == quantity &&
+        other.price == price;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, articleId, unitOfMeasureId, quantity, price);
+}
+
 String _formatDateInput(DateTime? value) {
   if (value == null) {
     return '';
@@ -699,4 +815,16 @@ double? _parseLocalizedDecimal(String value) {
 
 String _normalizeDecimalString(String value) {
   return value.trim().replaceAll(',', '.');
+}
+
+bool _listEquals<T>(List<T> left, List<T> right) {
+  if (left.length != right.length) {
+    return false;
+  }
+  for (var index = 0; index < left.length; index += 1) {
+    if (left[index] != right[index]) {
+      return false;
+    }
+  }
+  return true;
 }

@@ -5,6 +5,7 @@ import '../../data/purchase_orders/purchase_order_repository.dart';
 import '../../domain/purchase_order.dart';
 import '../../domain/user_session.dart';
 import '../purchase_order_detail_controller.dart';
+import '../unsaved_changes_guard.dart';
 import 'purchase_order_form_screen.dart';
 import 'purchase_order_receipt_screen.dart';
 
@@ -680,6 +681,7 @@ class _PriceAuditSheetState extends State<_PriceAuditSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _priceController;
   final TextEditingController _reasonController = TextEditingController();
+  late _PriceAuditDraftSnapshot _initialSnapshot;
 
   @override
   void initState() {
@@ -687,6 +689,7 @@ class _PriceAuditSheetState extends State<_PriceAuditSheet> {
     _priceController = TextEditingController(
       text: widget.line.unitPrice.toStringAsFixed(2).replaceAll('.', ','),
     );
+    _initialSnapshot = _buildSnapshot();
   }
 
   @override
@@ -709,6 +712,32 @@ class _PriceAuditSheetState extends State<_PriceAuditSheet> {
     );
   }
 
+  _PriceAuditDraftSnapshot _buildSnapshot() {
+    return _PriceAuditDraftSnapshot(
+      price: _normalizeDecimalString(_priceController.text),
+      reason: _reasonController.text.trim(),
+    );
+  }
+
+  bool get _hasUnsavedChanges => _buildSnapshot() != _initialSnapshot;
+
+  Future<void> _handlePopAttempt() async {
+    if (!_hasUnsavedChanges) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final shouldDiscard = await showDiscardChangesDialog(
+      context,
+      message:
+          'Imate nespremljenu korekciju cijene. Ako zatvorite ovaj prozor, uneseni podaci ce biti izgubljeni.',
+    );
+    if (!mounted || !shouldDiscard) {
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final insets = MediaQuery.of(context).viewInsets.bottom;
@@ -718,16 +747,24 @@ class _PriceAuditSheetState extends State<_PriceAuditSheet> {
       decimalDigits: 2,
     ).format(widget.line.unitPrice).trim();
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + insets),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) {
+          return;
+        }
+        await _handlePopAttempt();
+      },
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + insets),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Text(
                   'Korekcija cijene',
                   style: Theme.of(context).textTheme.headlineSmall,
@@ -746,6 +783,7 @@ class _PriceAuditSheetState extends State<_PriceAuditSheet> {
                   ),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setState(() {}),
                   validator: (value) {
                     final parsed = _parseLocalizedDecimal(value ?? '');
                     if (parsed == null || parsed <= 0) {
@@ -767,6 +805,7 @@ class _PriceAuditSheetState extends State<_PriceAuditSheet> {
                     labelText: 'Razlog promjene',
                     hintText: 'Navedite zasto mijenjate cijenu stavke.',
                   ),
+                  onChanged: (_) => setState(() {}),
                   validator: (value) {
                     if ((value ?? '').trim().isEmpty) {
                       return 'Unesite razlog promjene.';
@@ -775,27 +814,51 @@ class _PriceAuditSheetState extends State<_PriceAuditSheet> {
                   },
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Odustani'),
-                    ),
-                    const Spacer(),
-                    FilledButton(
-                      key: const Key('po-price-audit-submit'),
-                      onPressed: _submit,
-                      child: const Text('Spremi korekciju'),
-                    ),
-                  ],
-                ),
-              ],
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: _handlePopAttempt,
+                        child: const Text('Odustani'),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        key: const Key('po-price-audit-submit'),
+                        onPressed: _submit,
+                        child: const Text('Spremi korekciju'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _PriceAuditDraftSnapshot {
+  const _PriceAuditDraftSnapshot({
+    required this.price,
+    required this.reason,
+  });
+
+  final String price;
+  final String reason;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is _PriceAuditDraftSnapshot &&
+        other.price == price &&
+        other.reason == reason;
+  }
+
+  @override
+  int get hashCode => Object.hash(price, reason);
 }
 
 class _PriceAuditSubmission {
