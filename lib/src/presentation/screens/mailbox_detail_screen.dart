@@ -23,7 +23,7 @@ class MailboxDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Message Detail'),
+        title: const Text('Detalji poruke'),
       ),
       body: SafeArea(
         child: Padding(
@@ -181,7 +181,12 @@ class _MailboxDetailBody extends StatelessWidget {
               children: [
                 Text(
                   message.subject,
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Pregled posiljatelja, primatelja i sadrzaja poruke.',
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 14),
                 _DetailRow(label: 'Od', value: message.fromEmail),
@@ -208,6 +213,16 @@ class _MailboxDetailBody extends StatelessWidget {
                   'Sadrzaj poruke',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
+                if (message.isUsingHtmlFallback) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Prikazujemo tekstualni fallback jer bogatiji HTML prikaz jos nije podrzan u aplikaciji.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.secondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 SelectableText(message.bodyContent),
               ],
@@ -222,7 +237,7 @@ class _MailboxDetailBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Prilozi',
+                  'Prilozi (${message.attachments.length})',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 14),
@@ -266,6 +281,8 @@ class _AttachmentCard extends StatelessWidget {
           Text(
             attachment.filename,
             style: Theme.of(context).textTheme.titleMedium,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 8),
           if (attachment.contentType.isNotEmpty)

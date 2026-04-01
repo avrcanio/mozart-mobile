@@ -279,11 +279,142 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
 
-    expect(find.text('Message Detail'), findsOneWidget);
+    expect(find.text('Detalji poruke'), findsOneWidget);
     expect(find.text('Detalji ponude za tjednu nabavu.'), findsOneWidget);
     expect(find.text('manager@mozart.local'), findsOneWidget);
     expect(find.text('ponuda.pdf'), findsOneWidget);
     expect(find.text('Kopiraj link'), findsOneWidget);
+  });
+
+  testWidgets('uses html fallback messaging in mailbox detail when body text is missing', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 9,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mail',
+          'last_name': 'User',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 701,
+            'subject': 'HTML poruka',
+            'from_email': 'nabava@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 88,
+            'reference': 'PO-88',
+            'supplier_name': 'Warehouse One',
+            'status': 'sent',
+            'status_display': 'Sent',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/mailbox/messages/701/': _jsonResponse(<String, dynamic>{
+          'id': 701,
+          'subject': 'HTML poruka',
+          'from_email': 'nabava@mozart.hr',
+          'to_emails': 'root@mozart.local',
+          'sent_at': '2026-04-01T08:45:00Z',
+          'body_text': '',
+          'body_html': '<p>HTML fallback content</p>',
+          'attachments': <Map<String, dynamic>>[],
+        }),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Mailbox'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('HTML poruka'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detalji poruke'), findsOneWidget);
+    expect(
+      find.textContaining('tekstualni fallback'),
+      findsOneWidget,
+    );
+    expect(find.text('<p>HTML fallback content</p>'), findsOneWidget);
+    expect(find.text('Prilozi (0)'), findsOneWidget);
+  });
+
+  testWidgets('shows mailbox detail retry state on fetch error', (tester) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 9,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mail',
+          'last_name': 'User',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 702,
+            'subject': 'Broken detail',
+            'from_email': 'nabava@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 88,
+            'reference': 'PO-88',
+            'supplier_name': 'Warehouse One',
+            'status': 'sent',
+            'status_display': 'Sent',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/mailbox/messages/702/': _FakeResponse(
+          statusCode: 500,
+          body: jsonEncode(<String, dynamic>{'detail': 'Server error'}),
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Mailbox'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Broken detail'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detalji poruke nisu dostupni'), findsOneWidget);
+    expect(find.text('Pokusaj ponovno'), findsOneWidget);
   });
 
   testWidgets('renders purchase order list from mapped backend data', (

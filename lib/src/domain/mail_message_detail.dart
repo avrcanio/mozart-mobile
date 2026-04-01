@@ -22,12 +22,15 @@ class MailMessageDetail {
   final List<MailAttachment> attachments;
 
   bool get hasRecipients => toEmails.isNotEmpty || ccEmails.isNotEmpty;
+  bool get hasBodyText => bodyText.trim().isNotEmpty;
+  bool get hasBodyHtml => bodyHtml.trim().isNotEmpty;
+  bool get isUsingHtmlFallback => !hasBodyText && hasBodyHtml;
 
   String get bodyContent {
-    if (bodyText.trim().isNotEmpty) {
+    if (hasBodyText) {
       return bodyText.trim();
     }
-    if (bodyHtml.trim().isNotEmpty) {
+    if (hasBodyHtml) {
       return bodyHtml.trim();
     }
     return 'Poruka nema dostupnog sadrzaja.';
