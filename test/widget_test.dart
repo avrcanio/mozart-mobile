@@ -3996,7 +3996,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
                 },
               ],
             ),
-            'PUT /api/purchase-orders/44/': (ApiRequest request) {
+          'PATCH /api/purchase-orders/44/': (ApiRequest request) {
               capturedRequest = request;
               return _jsonResponse(<String, dynamic>{
                 'id': 44,
@@ -4180,7 +4180,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
                 },
               ],
             ),
-            'PUT /api/purchase-orders/44/': (ApiRequest request) {
+            'PATCH /api/purchase-orders/44/': (ApiRequest request) {
               capturedRequest = request;
               return _jsonResponse(<String, dynamic>{
                 'id': 44,
@@ -4302,7 +4302,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'GET /api/suppliers/2/artikli/': _jsonListResponse(
               <Map<String, dynamic>>[],
             ),
-            'PUT /api/purchase-orders/44/': (ApiRequest request) {
+            'PATCH /api/purchase-orders/44/': (ApiRequest request) {
               capturedRequest = request;
               return _jsonResponse(<String, dynamic>{
                 'id': 44,
@@ -4431,7 +4431,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
                 },
               ],
             ),
-            'PUT /api/purchase-orders/143/': (ApiRequest request) {
+            'PATCH /api/purchase-orders/143/': (ApiRequest request) {
               capturedRequest = request;
               return _jsonResponse(<String, dynamic>{
                 'id': 143,
@@ -4658,7 +4658,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
       apiClient: ApiClient(
         baseUrl: 'https://example.test',
         transport: _FakeTransport(<String, dynamic>{
-          'PUT /api/purchase-orders/44/': (ApiRequest request) {
+            'PATCH /api/purchase-orders/44/': (ApiRequest request) {
             capturedRequest = request;
             return _jsonResponse(<String, dynamic>{
               'id': 44,

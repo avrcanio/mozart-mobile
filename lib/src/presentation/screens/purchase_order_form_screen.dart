@@ -220,13 +220,13 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
   }
 
   SupplierDto? _findSupplierByName(List<SupplierDto> suppliers, String name) {
-    final normalizedName = name.trim().toLowerCase();
+    final normalizedName = _normalizeSupplierName(name);
     if (normalizedName.isEmpty) {
       return null;
     }
 
     for (final supplier in suppliers) {
-      if (supplier.name.trim().toLowerCase() == normalizedName) {
+      if (_normalizeSupplierName(supplier.name) == normalizedName) {
         return supplier;
       }
     }
@@ -234,13 +234,33 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     return null;
   }
 
-  void _handleSupplierTextChanged(FormFieldState<int> field, String value) {
-    final supplierName = value.trim();
-    final confirmedSupplierName = _selectedSupplierName?.trim();
-    if (confirmedSupplierName != null && confirmedSupplierName == supplierName) {
-      field.didChange(_selectedSupplierId);
+  void _restoreSupplierSelectionFromField() {
+    final supplierName = _supplierController.text;
+    final resolvedSupplier = _findSupplierByName(_suppliers, supplierName);
+    if (resolvedSupplier == null) {
       return;
     }
+
+    _selectedSupplierId = resolvedSupplier.id;
+    _selectedSupplierName = resolvedSupplier.name;
+  }
+
+  void _handleSupplierTextChanged(FormFieldState<int> field, String value) {
+    final resolvedSupplier = _findSupplierByName(_suppliers, value);
+    if (resolvedSupplier != null) {
+      final hasSameSelection =
+          _selectedSupplierId == resolvedSupplier.id &&
+          _selectedSupplierName == resolvedSupplier.name;
+      if (!hasSameSelection) {
+        setState(() {
+          _selectedSupplierId = resolvedSupplier.id;
+          _selectedSupplierName = resolvedSupplier.name;
+        });
+      }
+      field.didChange(resolvedSupplier.id);
+      return;
+    }
+
     if (_hasValidSupplierSelection) {
       setState(() {
         _selectedSupplierId = null;
@@ -297,6 +317,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
   }
 
   Future<void> _submit() async {
+    _restoreSupplierSelectionFromField();
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -1021,4 +1042,11 @@ bool _listEquals<T>(List<T> left, List<T> right) {
     }
   }
   return true;
+}
+
+String _normalizeSupplierName(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+'), ' ');
 }

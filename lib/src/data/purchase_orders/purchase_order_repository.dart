@@ -239,7 +239,7 @@ class PurchaseOrderRepository {
     required Map<String, dynamic> payload,
     required String authToken,
   }) async {
-    final json = await _apiClient.putJson(
+    final json = await _apiClient.patchJson(
       '/api/purchase-orders/$orderId/',
       authToken: authToken,
       body: payload,
