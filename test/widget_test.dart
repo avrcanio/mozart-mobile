@@ -88,6 +88,57 @@ void main() {
     expect(find.text('1'), findsWidgets);
   });
 
+  testWidgets('shows signed-in user identity only once in app header', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 7,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mozart',
+          'last_name': 'Operator',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 101,
+            'subject': 'Daily digest',
+            'from_email': 'office@mozart.local',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T10:15:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 15,
+            'reference': 'PO-15',
+            'supplier_name': 'Adriatic Trade',
+            'status': 'draft',
+            'status_display': 'Draft',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '145.50',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.text('Mozart Mobile'), findsOneWidget);
+    expect(find.text('Mozart Operator'), findsOneWidget);
+    expect(find.text('root'), findsOneWidget);
+  });
+
   testWidgets('dashboard uses backend counts instead of first-page list length', (
     tester,
   ) async {

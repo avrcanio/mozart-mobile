@@ -209,15 +209,9 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Row(
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Mozart Mobile'),
-                  Text(
-                    widget.session.displayName,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
+              child: Text(
+                'Mozart Mobile',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
             const SizedBox(width: 12),
