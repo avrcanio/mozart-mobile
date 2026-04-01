@@ -8,11 +8,13 @@ class AuthRepository {
   AuthRepository({
     required ApiClient apiClient,
     required AuthStorage storage,
+    this.logoutPath,
   })  : _apiClient = apiClient,
         _storage = storage;
 
   final ApiClient _apiClient;
   final AuthStorage _storage;
+  final String? logoutPath;
 
   Uri get tokenEndpoint => _apiClient.endpoint('/api/token/');
 
@@ -63,8 +65,23 @@ class AuthRepository {
     }
   }
 
-  Future<void> logout() async {
-    await _storage.clearToken();
+  bool get supportsRemoteLogout =>
+      logoutPath != null && logoutPath!.trim().isNotEmpty;
+
+  Future<void> logout({String? authToken}) async {
+    try {
+      if (supportsRemoteLogout &&
+          authToken != null &&
+          authToken.trim().isNotEmpty) {
+        await _apiClient.postJson(logoutPath!, authToken: authToken);
+      }
+    } on ApiException {
+      // Local sign-out remains authoritative even if backend invalidation fails.
+    } on FormatException {
+      // Local sign-out remains authoritative even if backend invalidation fails.
+    } finally {
+      await _storage.clearToken();
+    }
   }
 
   Future<UserSession> _fetchSession(String token) async {

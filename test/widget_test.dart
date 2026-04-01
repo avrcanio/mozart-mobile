@@ -1805,6 +1805,57 @@ void main() {
     expect(await harness.storage.readToken(), isNull);
   });
 
+  test('uses backend logout invalidation when a logout endpoint is configured', () async {
+    ApiRequest? capturedRequest;
+    final storage = InMemoryAuthStorage();
+    await storage.saveToken('saved-token');
+    final repository = AuthRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'POST /api/logout/': (ApiRequest request) {
+            capturedRequest = request;
+            return const _FakeResponse(statusCode: 204, body: '');
+          },
+        }),
+      ),
+      storage: storage,
+      logoutPath: '/api/logout/',
+    );
+
+    await repository.logout(authToken: 'saved-token');
+
+    expect(capturedRequest, isNotNull);
+    expect(capturedRequest!.method, 'POST');
+    expect(
+      capturedRequest!.headers['Authorization'],
+      'Token saved-token',
+    );
+    expect(await storage.readToken(), isNull);
+  });
+
+  test('keeps local sign-out predictable when backend logout invalidation fails', () async {
+    final storage = InMemoryAuthStorage();
+    await storage.saveToken('saved-token');
+    final repository = AuthRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'POST /api/logout/': const _FakeResponse(
+            statusCode: 503,
+            body: '{"detail":"Service unavailable"}',
+          ),
+        }),
+      ),
+      storage: storage,
+      logoutPath: '/api/logout/',
+    );
+
+    await repository.logout(authToken: 'saved-token');
+
+    expect(await storage.readToken(), isNull);
+  });
+
   testWidgets('sends eligible purchase order and refreshes detail state', (
     tester,
   ) async {

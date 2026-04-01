@@ -19,6 +19,7 @@ Flutter MVP scaffold for issue `#1`, based on the migration brief from the exist
 - `POST /api/token/` for login
 - `GET /api/me/` for current user details
 - Existing mailbox and purchase order endpoints remain the source of truth
+- Logout currently relies on local secure-storage sign-out. The mobile client is ready for optional backend token invalidation when a dedicated logout endpoint is exposed.
 
 The app now performs real token-based auth and backend requests, with secure device storage for session persistence.
 
@@ -36,11 +37,16 @@ Override the API base URL when needed:
 flutter run --dart-define=MOZART_API_BASE_URL=https://your-backend.example.com
 ```
 
+## Logout semantics
+
+- Current production behavior is intentional local sign-out: the stored token is removed from device secure storage and the app returns to the login screen immediately.
+- The auth repository also supports optional backend logout invalidation when a dedicated endpoint is configured later.
+- If backend invalidation is unavailable or fails, local sign-out still completes so the operator is not left in a broken logout state.
+
 ## Next implementation steps
 
 - Expand purchase-order workflow coverage with more mutation paths
 - Add integration-style coverage around create/edit/send flows
-- Confirm logout semantics for token invalidation vs local sign-out
 
 ## CI
 

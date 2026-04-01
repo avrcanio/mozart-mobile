@@ -91,7 +91,7 @@ class SessionController extends ValueNotifier<SessionState> {
   }
 
   Future<void> logout() async {
-    await _authRepository.logout();
+    await _authRepository.logout(authToken: value.session?.token);
     value = const SessionState.initial();
   }
 }
