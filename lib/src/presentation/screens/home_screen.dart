@@ -171,6 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, state, _) => _MailboxTab(
           state: state,
           onRetry: _loadAll,
+          onLoadMore: () => _mailboxController.loadMore(widget.session.token),
           repository: widget.mailboxRepository,
           session: widget.session,
         ),
@@ -548,12 +549,14 @@ class _MailboxTab extends StatelessWidget {
   const _MailboxTab({
     required this.state,
     required this.onRetry,
+    required this.onLoadMore,
     required this.repository,
     required this.session,
   });
 
   final MailboxState state;
   final VoidCallback onRetry;
+  final Future<void> Function() onLoadMore;
   final MailboxRepository repository;
   final UserSession session;
 
@@ -564,7 +567,9 @@ class _MailboxTab extends StatelessWidget {
 
     return _PageFrame(
       child: ListView.separated(
-        itemCount: state.messages.isEmpty ? 2 : state.messages.length + 1,
+        itemCount: state.messages.isEmpty
+            ? 2
+            : state.messages.length + 1 + (state.hasMorePages ? 1 : 0),
         separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           if (index == 0) {
@@ -612,6 +617,32 @@ class _MailboxTab extends StatelessWidget {
               message: 'Trenutno nema novih poruka u sanducicu.',
               actionLabel: 'Osvjezi',
               onAction: onRetry,
+            );
+          }
+
+          final footerIndex = state.messages.length + 1;
+          if (state.hasMorePages && index == footerIndex) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (state.loadMoreErrorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _ErrorBanner(message: state.loadMoreErrorMessage!),
+                  ),
+                FilledButton.tonal(
+                  key: const Key('mailbox-load-more'),
+                  onPressed: state.isLoadingMore ? null : onLoadMore,
+                  child: Text(
+                    state.isLoadingMore ? 'Ucitavanje...' : 'Ucitaj jos',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Prikazano ${state.messages.length} od ${state.totalCount} poruka.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
             );
           }
 

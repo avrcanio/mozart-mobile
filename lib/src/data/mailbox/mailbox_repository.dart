@@ -15,10 +15,15 @@ class MailboxRepository {
 
   Future<MailboxPage> fetchMessagesPage({
     required String authToken,
+    int page = 1,
   }) async {
+    final queryParameters = <String, String>{
+      if (page > 1) 'page': '$page',
+    };
     final json = await _apiClient.getJson(
       '/api/mailbox/messages/',
       authToken: authToken,
+      queryParameters: queryParameters,
     );
     final results = (json['results'] as List<dynamic>? ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
@@ -34,9 +39,13 @@ class MailboxRepository {
 
   Future<List<MailMessage>> fetchMessages({
     required String authToken,
+    int page = 1,
   }) async {
-    final page = await fetchMessagesPage(authToken: authToken);
-    return page.messages;
+    final mailboxPage = await fetchMessagesPage(
+      authToken: authToken,
+      page: page,
+    );
+    return mailboxPage.messages;
   }
 
   Future<MailMessageDetail> fetchMessageDetail({

@@ -612,6 +612,188 @@ void main() {
     expect(find.text('Pokusaj ponovno'), findsOneWidget);
   });
 
+  testWidgets('loads additional mailbox pages on demand', (tester) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 9,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mail',
+          'last_name': 'User',
+        }),
+        'GET /api/mailbox/messages/': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 801,
+              'subject': 'Inbox one',
+              'from_email': 'nabava@mozart.hr',
+              'to_emails': 'root@mozart.local',
+              'sent_at': '2026-04-01T08:45:00Z',
+              'attachments_count': 0,
+            },
+            <String, dynamic>{
+              'id': 802,
+              'subject': 'Inbox two',
+              'from_email': 'office@mozart.hr',
+              'to_emails': 'root@mozart.local',
+              'sent_at': '2026-04-01T09:45:00Z',
+              'attachments_count': 1,
+            },
+          ],
+        ),
+        'GET /api/mailbox/messages/?page=2': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 803,
+              'subject': 'Inbox three',
+              'from_email': 'warehouse@mozart.hr',
+              'to_emails': 'root@mozart.local',
+              'sent_at': '2026-04-01T10:45:00Z',
+              'attachments_count': 0,
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 88,
+            'reference': 'PO-88',
+            'supplier_name': 'Warehouse One',
+            'status': 'sent',
+            'status_display': 'Sent',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Mailbox'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Inbox one'), findsOneWidget);
+    expect(find.text('Inbox two'), findsOneWidget);
+    expect(find.text('Inbox three'), findsNothing);
+    expect(find.text('Ucitaj jos'), findsOneWidget);
+    expect(find.text('Prikazano 2 od 3 poruka.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('mailbox-load-more')));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Inbox three'), findsOneWidget);
+    expect(find.text('Ucitaj jos'), findsNothing);
+  });
+
+  testWidgets('preserves mailbox detail navigation after loading more pages', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 9,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mail',
+          'last_name': 'User',
+        }),
+        'GET /api/mailbox/messages/': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 801,
+              'subject': 'Inbox one',
+              'from_email': 'nabava@mozart.hr',
+              'to_emails': 'root@mozart.local',
+              'sent_at': '2026-04-01T08:45:00Z',
+              'attachments_count': 0,
+            },
+            <String, dynamic>{
+              'id': 802,
+              'subject': 'Inbox two',
+              'from_email': 'office@mozart.hr',
+              'to_emails': 'root@mozart.local',
+              'sent_at': '2026-04-01T09:45:00Z',
+              'attachments_count': 1,
+            },
+          ],
+        ),
+        'GET /api/mailbox/messages/?page=2': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 803,
+              'subject': 'Inbox three',
+              'from_email': 'warehouse@mozart.hr',
+              'to_emails': 'root@mozart.local',
+              'sent_at': '2026-04-01T10:45:00Z',
+              'attachments_count': 0,
+            },
+          ],
+        ),
+        'GET /api/mailbox/messages/803/': _jsonResponse(<String, dynamic>{
+          'id': 803,
+          'subject': 'Inbox three',
+          'from_email': 'warehouse@mozart.hr',
+          'to_emails': 'root@mozart.local',
+          'sent_at': '2026-04-01T10:45:00Z',
+          'body_text': 'Older message detail after pagination.',
+          'attachments': <Map<String, dynamic>>[],
+        }),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 88,
+            'reference': 'PO-88',
+            'supplier_name': 'Warehouse One',
+            'status': 'sent',
+            'status_display': 'Sent',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Mailbox'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('mailbox-load-more')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('mailbox-load-more')));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Inbox three'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detalji poruke'), findsOneWidget);
+    expect(find.text('Older message detail after pagination.'), findsOneWidget);
+  });
+
   testWidgets('renders purchase order list from mapped backend data', (
     tester,
   ) async {
