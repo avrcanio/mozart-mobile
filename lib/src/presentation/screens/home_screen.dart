@@ -1343,9 +1343,9 @@ class _StatusBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.done, size: 16, color: config.firstColor),
-            const SizedBox(width: 2),
-            Icon(Icons.done, size: 16, color: config.secondColor),
+            _BoldCheckMark(color: config.firstColor),
+            const SizedBox(width: 1),
+            _BoldCheckMark(color: config.secondColor),
           ],
         ),
       ),
@@ -1391,6 +1391,51 @@ class _StatusBadgeConfig {
   final String tooltip;
 }
 
+class _BoldCheckMark extends StatelessWidget {
+  const _BoldCheckMark({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 18,
+      height: 18,
+      child: CustomPaint(
+        painter: _BoldCheckMarkPainter(color),
+      ),
+    );
+  }
+}
+
+class _BoldCheckMarkPainter extends CustomPainter {
+  const _BoldCheckMarkPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path()
+      ..moveTo(size.width * 0.18, size.height * 0.54)
+      ..lineTo(size.width * 0.42, size.height * 0.78)
+      ..lineTo(size.width * 0.84, size.height * 0.24);
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _BoldCheckMarkPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
+
 class _PaymentBadgeConfig {
   const _PaymentBadgeConfig({
     required this.icon,
@@ -1410,10 +1455,8 @@ _StatusBadgeConfig _statusBadgeFor(PurchaseOrder order) {
   const yellow = Color(0xFFE0A400);
   const green = Color(0xFF2E9D57);
   const neutral = Color(0xFF7A6F66);
-  const blueBg = Color(0xFFE7EFFE);
-  const yellowBg = Color(0xFFFFF1CC);
+  const whiteBg = Colors.white;
   const greenBg = Color(0xFFDCF4E4);
-  const mixedBg = Color(0xFFEAF0E4);
   const neutralBg = Color(0xFFECE7E3);
 
   switch (_normalizedOrderStatus(order)) {
@@ -1421,28 +1464,28 @@ _StatusBadgeConfig _statusBadgeFor(PurchaseOrder order) {
       return const _StatusBadgeConfig(
         firstColor: blue,
         secondColor: blue,
-        backgroundColor: blueBg,
+        backgroundColor: whiteBg,
         tooltip: 'Kreirana',
       );
     case 'sent':
       return const _StatusBadgeConfig(
         firstColor: blue,
         secondColor: yellow,
-        backgroundColor: mixedBg,
+        backgroundColor: whiteBg,
         tooltip: 'Poslana',
       );
     case 'confirmed':
       return const _StatusBadgeConfig(
         firstColor: yellow,
         secondColor: yellow,
-        backgroundColor: yellowBg,
+        backgroundColor: whiteBg,
         tooltip: 'Potvrđena',
       );
     case 'received':
       return const _StatusBadgeConfig(
         firstColor: green,
         secondColor: blue,
-        backgroundColor: mixedBg,
+        backgroundColor: whiteBg,
         tooltip: 'Djelomično zaprimljena',
       );
     case 'received_all':

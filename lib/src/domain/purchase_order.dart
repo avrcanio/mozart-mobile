@@ -50,6 +50,18 @@ class PurchaseOrder {
       lines.fold(0, (sum, line) => sum + line.remainingQuantity);
 
   bool get canSend => status == 'created';
+
+  bool get isLockedForEditing {
+    if (!receiptCreated) {
+      return false;
+    }
+
+    final normalizedStatus = _normalizePurchaseOrderStatus(status);
+    final normalizedLabel = _normalizePurchaseOrderStatus(statusLabel);
+    return normalizedStatus == 'received_all' ||
+        normalizedLabel == 'received_all' ||
+        remainingQuantity <= 0;
+  }
 }
 
 class PurchaseOrderHistoryEntry {
@@ -88,4 +100,24 @@ class PurchaseOrderLine {
   final double receivedQuantity;
   final double remainingQuantity;
   final double unitPrice;
+}
+
+String _normalizePurchaseOrderStatus(String value) {
+  final normalized = value
+      .trim()
+      .toLowerCase()
+      .replaceAll('č', 'c')
+      .replaceAll('ć', 'c')
+      .replaceAll('ž', 'z')
+      .replaceAll('š', 's')
+      .replaceAll('đ', 'd');
+
+  switch (normalized) {
+    case 'received_all':
+    case 'sve zaprimljeno':
+    case 'sve stavke s narudzbe su zaprimljene':
+      return 'received_all';
+    default:
+      return normalized;
+  }
 }

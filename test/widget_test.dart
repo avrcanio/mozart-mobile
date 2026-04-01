@@ -1266,8 +1266,8 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'id': 2050,
             'reference': 'PO-2050',
             'supplier_name': 'Fructus d.o.o.',
-            'status': 'received',
-            'status_display': 'Djelomično zaprimljena',
+            'status': 'received_all',
+            'status_display': 'Sve stavke s narudžbe su zaprimljene',
             'payment_type_name': 'Virman',
             'ordered_at': '2026-04-01T11:30:00Z',
             'total_gross': '95.10',
@@ -1307,6 +1307,21 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(find.byKey(const Key('po-payment-badge-2048')), findsOneWidget);
     expect(find.byKey(const Key('po-payment-badge-2049')), findsOneWidget);
     expect(find.byKey(const Key('po-payment-badge-2050')), findsOneWidget);
+
+    final createdBadge = tester.widget<Container>(
+      find.byKey(const Key('po-status-badge-2049')),
+    );
+    final receivedAllBadge = tester.widget<Container>(
+      find.byKey(const Key('po-status-badge-2050')),
+    );
+    expect(
+      (createdBadge.decoration! as BoxDecoration).color,
+      equals(Colors.white),
+    );
+    expect(
+      (receivedAllBadge.decoration! as BoxDecoration).color,
+      equals(const Color(0xFFDCF4E4)),
+    );
   });
 
   testWidgets('filters out representation payment type in purchase order form', (
@@ -2930,6 +2945,99 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(find.text('Zaprimanje robe je uspješno spremljeno.'), findsOneWidget);
     expect(find.text('Sve stavke s narudzbe su zaprimljene'), findsWidgets);
     expect(find.text('Zaprimanje robe'), findsNothing);
+  });
+
+  testWidgets('hides edit and price audit actions for fully received orders with receipt', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 7,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mozart',
+          'last_name': 'Operator',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 101,
+            'subject': 'Daily digest',
+            'from_email': 'office@mozart.local',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T10:15:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 350,
+            'reference': 'PO-LOCKED',
+            'supplier_name': 'Adriatic Trade',
+            'status': 'received_all',
+            'status_display': 'Sve stavke s narudzbe su zaprimljene',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '145.50',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/purchase-orders/350/': _jsonResponse(<String, dynamic>{
+          'id': 350,
+          'reference': 'PO-LOCKED',
+          'supplier': 2,
+          'supplier_name': 'Adriatic Trade',
+          'status': 'received_all',
+          'status_display': 'Sve stavke s narudzbe su zaprimljene',
+          'payment_type': 5,
+          'payment_type_name': 'Virman',
+          'ordered_at': '2026-04-01T09:30:00Z',
+          'currency': 'EUR',
+          'total_net': '120.00',
+          'total_gross': '145.50',
+          'created_by': 'vbadzim',
+          'primka_created': true,
+          'items': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 8,
+              'artikl': 77,
+              'artikl_name': 'Coffee beans',
+              'quantity': '10.0000',
+              'unit_of_measure': 1,
+              'unit_name': 'kg',
+              'price': '12.00',
+              'received_quantity': '10.0000',
+              'remaining_quantity': '0.0000',
+              'base_group': '',
+            },
+          ],
+        }),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('PO-LOCKED').first);
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Coffee beans'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.widgetWithText(OutlinedButton, 'Uredi'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, 'Korigiraj cijenu'), findsNothing);
+    expect(find.text('Povijest statusa'), findsOneWidget);
+    expect(find.text('Coffee beans'), findsOneWidget);
   });
 
   testWidgets('updates purchase order item price and refreshes totals', (

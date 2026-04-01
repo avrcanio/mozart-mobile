@@ -318,11 +318,12 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                   label: Text(state.isSending ? 'Slanje...' : 'Pošalji narudžbu'),
                 ),
                 const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: () => onEdit(order),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Uredi'),
-                ),
+                if (!order.isLockedForEditing)
+                  OutlinedButton.icon(
+                    onPressed: () => onEdit(order),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Uredi'),
+                  ),
                 if (order.remainingQuantity > 0)
                   OutlinedButton.icon(
                     onPressed: () => onReceive(order),
@@ -339,11 +340,12 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => onEdit(order),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Uredi'),
-                ),
+                if (!order.isLockedForEditing)
+                  OutlinedButton.icon(
+                    onPressed: () => onEdit(order),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Uredi'),
+                  ),
                 if (order.remainingQuantity > 0)
                   OutlinedButton.icon(
                     onPressed: () => onReceive(order),
@@ -496,6 +498,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                         isUpdatingPrice:
                             state.isUpdatingPrice &&
                             state.activePriceItemId == line.id,
+                        isReadOnly: order.isLockedForEditing,
                         currency: order.currency,
                         numberFormat: numberFormat,
                         currencyFormat: currencyFormat,
@@ -548,6 +551,7 @@ class _LineItemCard extends StatelessWidget {
   const _LineItemCard({
     required this.line,
     required this.isUpdatingPrice,
+    required this.isReadOnly,
     required this.currency,
     required this.numberFormat,
     required this.currencyFormat,
@@ -556,6 +560,7 @@ class _LineItemCard extends StatelessWidget {
 
   final PurchaseOrderLine line;
   final bool isUpdatingPrice;
+  final bool isReadOnly;
   final String currency;
   final NumberFormat numberFormat;
   final NumberFormat currencyFormat;
@@ -588,23 +593,25 @@ class _LineItemCard extends StatelessWidget {
           Text(
             'Cijena: ${_formatMoney(line.unitPrice, currency, currencyFormat)}',
           ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: isUpdatingPrice ? null : onPriceAudit,
-              icon: isUpdatingPrice
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.price_change_outlined),
-              label: Text(
-                isUpdatingPrice ? 'Azuriranje...' : 'Korigiraj cijenu',
+          if (!isReadOnly) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: isUpdatingPrice ? null : onPriceAudit,
+                icon: isUpdatingPrice
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.price_change_outlined),
+                label: Text(
+                  isUpdatingPrice ? 'Azuriranje...' : 'Korigiraj cijenu',
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
