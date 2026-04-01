@@ -13,18 +13,30 @@ class MailboxRepository {
 
   Uri detailEndpoint(int id) => _apiClient.endpoint('/api/mailbox/messages/$id/');
 
-  Future<List<MailMessage>> fetchMessages({
+  Future<MailboxPage> fetchMessagesPage({
     required String authToken,
   }) async {
-    final jsonList = await _apiClient.getJsonList(
+    final json = await _apiClient.getJson(
       '/api/mailbox/messages/',
       authToken: authToken,
     );
-    return jsonList
+    final results = (json['results'] as List<dynamic>? ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
         .map(MailMessageDto.fromJson)
         .map((dto) => dto.toDomain())
         .toList();
+
+    return MailboxPage(
+      count: _asCount(json['count'], fallback: results.length),
+      messages: results,
+    );
+  }
+
+  Future<List<MailMessage>> fetchMessages({
+    required String authToken,
+  }) async {
+    final page = await fetchMessagesPage(authToken: authToken);
+    return page.messages;
   }
 
   Future<MailMessageDetail> fetchMessageDetail({
@@ -37,4 +49,21 @@ class MailboxRepository {
     );
     return MailMessageDetailDto.fromJson(json).toDomain();
   }
+
+  static int _asCount(dynamic value, {required int fallback}) {
+    if (value is int) {
+      return value;
+    }
+    return int.tryParse((value ?? '').toString()) ?? fallback;
+  }
+}
+
+class MailboxPage {
+  const MailboxPage({
+    required this.count,
+    required this.messages,
+  });
+
+  final int count;
+  final List<MailMessage> messages;
 }

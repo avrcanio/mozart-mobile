@@ -73,6 +73,9 @@ void main() {
             'items': <Map<String, dynamic>>[],
           },
         ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
       },
     );
 
@@ -83,6 +86,77 @@ void main() {
     expect(find.text('Mozart Operator'), findsAtLeastNWidgets(1));
     expect(find.text('Open POs'), findsOneWidget);
     expect(find.text('1'), findsWidgets);
+  });
+
+  testWidgets('dashboard uses backend counts instead of first-page list length', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 7,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mozart',
+          'last_name': 'Operator',
+        }),
+        'GET /api/mailbox/messages/': _jsonPaginatedResponse(
+          count: 27,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 101,
+              'subject': 'Daily digest',
+              'from_email': 'office@mozart.local',
+              'to_emails': 'root@mozart.local',
+              'sent_at': '2026-04-01T10:15:00Z',
+              'attachments_count': 0,
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/': _jsonPaginatedResponse(
+          count: 14,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 15,
+              'reference': 'PO-15',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'sent',
+              'status_display': 'Poslana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/?status=created': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 19,
+              'reference': 'PO-19',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    expect(find.text('14'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('27'), findsOneWidget);
+    expect(find.text('Messages'), findsOneWidget);
+    expect(find.text('Unread Mail'), findsNothing);
   });
 
   testWidgets('renders mailbox list from mapped backend data', (tester) async {
@@ -1053,9 +1127,19 @@ _FakeResponse _jsonResponse(Map<String, dynamic> json) {
 }
 
 _FakeResponse _jsonListResponse(List<Map<String, dynamic>> json) {
+  return _jsonPaginatedResponse(count: json.length, results: json);
+}
+
+_FakeResponse _jsonPaginatedResponse({
+  required int count,
+  required List<Map<String, dynamic>> results,
+}) {
   return _FakeResponse(
     statusCode: 200,
-    body: jsonEncode(<String, dynamic>{'results': json}),
+    body: jsonEncode(<String, dynamic>{
+      'count': count,
+      'results': results,
+    }),
   );
 }
 
@@ -1098,12 +1182,18 @@ class _FakeTransport implements ApiTransport {
 
   @override
   Future<ApiResponse> send(ApiRequest request) async {
-    final key = request.uri.hasQuery
+    final exactKey = request.uri.hasQuery
         ? '${request.method} ${request.uri.path}?${request.uri.query}'
         : '${request.method} ${request.uri.path}';
-    final candidate = responses[key];
+    final fallbackKey = '${request.method} ${request.uri.path}';
+    final exactCandidate = responses[exactKey];
+    final fallbackCandidate = responses[fallbackKey];
+    final candidate = exactCandidate ??
+        (request.uri.hasQuery && fallbackCandidate is List<_FakeResponse>
+            ? null
+            : fallbackCandidate);
     if (candidate == null) {
-      throw StateError('Missing fake response for $key');
+      throw StateError('Missing fake response for $exactKey');
     }
 
     late final _FakeResponse response;
@@ -1116,7 +1206,7 @@ class _FakeTransport implements ApiTransport {
     } else if (candidate is Future<_FakeResponse> Function(ApiRequest)) {
       response = await candidate(request);
     } else {
-      throw StateError('Invalid fake response for $key');
+      throw StateError('Invalid fake response for $exactKey');
     }
 
     return ApiResponse(

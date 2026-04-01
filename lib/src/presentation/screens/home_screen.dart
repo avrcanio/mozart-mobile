@@ -363,9 +363,9 @@ class _DashboardTab extends StatelessWidget {
         const Color(0xFFE2ECE0),
       ),
       (
-        'Unread Mail',
-        '${summary?.unreadMessages ?? 0}',
-        Icons.mark_email_unread,
+        'Messages',
+        '${summary?.totalMessages ?? 0}',
+        Icons.mail_outline,
         const Color(0xFFF6E8D8),
       ),
       (

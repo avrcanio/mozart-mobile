@@ -32,20 +32,36 @@ class PurchaseOrderRepository {
   Uri sendEndpoint(int orderId) =>
       _apiClient.endpoint('/api/purchase-orders/$orderId/send/');
 
-  Future<List<PurchaseOrder>> fetchPurchaseOrders({
+  Future<PurchaseOrderPage> fetchPurchaseOrdersPage({
     required String authToken,
     PurchaseOrderFilters filters = const PurchaseOrderFilters(),
   }) async {
-    final jsonList = await _apiClient.getJsonList(
+    final json = await _apiClient.getJson(
       '/api/purchase-orders/',
       authToken: authToken,
       queryParameters: filters.toQueryParameters(),
     );
-    return jsonList
+    final orders = (json['results'] as List<dynamic>? ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()
         .map(PurchaseOrderDto.fromJson)
         .map((dto) => dto.toDomain())
         .toList();
+
+    return PurchaseOrderPage(
+      count: _asCount(json['count'], fallback: orders.length),
+      orders: orders,
+    );
+  }
+
+  Future<List<PurchaseOrder>> fetchPurchaseOrders({
+    required String authToken,
+    PurchaseOrderFilters filters = const PurchaseOrderFilters(),
+  }) async {
+    final page = await fetchPurchaseOrdersPage(
+      authToken: authToken,
+      filters: filters,
+    );
+    return page.orders;
   }
 
   Future<PurchaseOrder> fetchPurchaseOrderDetail({
@@ -158,4 +174,21 @@ class PurchaseOrderRepository {
     );
     return PurchaseOrderDto.fromJson(json).toDomain();
   }
+
+  static int _asCount(dynamic value, {required int fallback}) {
+    if (value is int) {
+      return value;
+    }
+    return int.tryParse((value ?? '').toString()) ?? fallback;
+  }
+}
+
+class PurchaseOrderPage {
+  const PurchaseOrderPage({
+    required this.count,
+    required this.orders,
+  });
+
+  final int count;
+  final List<PurchaseOrder> orders;
 }
