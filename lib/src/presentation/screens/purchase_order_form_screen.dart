@@ -76,6 +76,9 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
   }
 
   SupplierDto? get _selectedSupplier {
+    if (!_hasValidSupplierSelection) {
+      return null;
+    }
     for (final supplier in _suppliers) {
       if (supplier.id == _selectedSupplierId) {
         return supplier;
@@ -110,6 +113,9 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     return filtered;
   }
 
+  bool get _hasValidSupplierSelection =>
+      _selectedSupplierId != null && _selectedSupplierId! > 0;
+
   Future<void> _loadLookups() async {
     setState(() {
       _isLoading = true;
@@ -124,8 +130,21 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       final suppliers = futures[0] as List<SupplierDto>;
       final paymentTypes = futures[1] as List<PaymentTypeDto>;
 
+      if (!_hasValidSupplierSelection) {
+        final fallbackSupplierName =
+            _selectedSupplierName ?? widget.initialOrder?.supplierName ?? '';
+        final resolvedSupplier = _findSupplierByName(
+          suppliers,
+          fallbackSupplierName,
+        );
+        if (resolvedSupplier != null) {
+          _selectedSupplierId = resolvedSupplier.id;
+          _selectedSupplierName = resolvedSupplier.name;
+        }
+      }
+
       List<SupplierArticleDto> articles = const <SupplierArticleDto>[];
-      if (_selectedSupplierId != null) {
+      if (_hasValidSupplierSelection) {
         articles = await widget.repository.fetchSupplierArticles(
           supplierId: _selectedSupplierId!,
           authToken: widget.session.token,
@@ -200,6 +219,21 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     );
   }
 
+  SupplierDto? _findSupplierByName(List<SupplierDto> suppliers, String name) {
+    final normalizedName = name.trim().toLowerCase();
+    if (normalizedName.isEmpty) {
+      return null;
+    }
+
+    for (final supplier in suppliers) {
+      if (supplier.name.trim().toLowerCase() == normalizedName) {
+        return supplier;
+      }
+    }
+
+    return null;
+  }
+
   void _handleSupplierTextChanged(FormFieldState<int> field, String value) {
     final supplierName = value.trim();
     final confirmedSupplierName = _selectedSupplierName?.trim();
@@ -207,7 +241,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       field.didChange(_selectedSupplierId);
       return;
     }
-    if (_selectedSupplierId != null) {
+    if (_hasValidSupplierSelection) {
       setState(() {
         _selectedSupplierId = null;
         _selectedSupplierName = null;
@@ -266,7 +300,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    if (_selectedSupplierId == null || _selectedPaymentTypeId == null) {
+    if (!_hasValidSupplierSelection || _selectedPaymentTypeId == null) {
       setState(() {
         _errorMessage = 'Odaberite dobavlja\u010Da i tip pla\u0107anja.';
       });
@@ -390,6 +424,8 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
         ),
         floatingActionButton: _selectedSupplierId == null
             ? null
+            : !_hasValidSupplierSelection
+            ? null
             : FloatingActionButton.extended(
                 onPressed: _articles.isEmpty ? null : _addLine,
                 icon: const Icon(Icons.add),
@@ -422,7 +458,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                           if (supplierName.isEmpty) {
                             return 'Odaberite dobavlja\u010Da.';
                           }
-                          if (_selectedSupplierId == null) {
+                          if (!_hasValidSupplierSelection) {
                             return 'Odaberite dobavlja\u010Da iz popisa.';
                           }
                           if ((_selectedSupplierName?.trim() ?? '') !=

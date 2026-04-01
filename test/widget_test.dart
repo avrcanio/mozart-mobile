@@ -4406,6 +4406,130 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
   );
 
   testWidgets(
+    'resolves missing supplier id from supplier lookup when editing purchase order',
+    (tester) async {
+      ApiRequest? capturedRequest;
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Koktel Ugostiteljstvo d.o.o.'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'American'},
+              <String, dynamic>{'id': 6, 'name': 'Gotovina'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 77,
+                  'artikl_name': 'Rucnici Kuhinjski Teta Violeta 2/1',
+                  'unit_of_measure': 1,
+                  'unit_name': 'Paket',
+                  'price': '2.29',
+                },
+              ],
+            ),
+            'PUT /api/purchase-orders/143/': (ApiRequest request) {
+              capturedRequest = request;
+              return _jsonResponse(<String, dynamic>{
+                'id': 143,
+                'reference': '143',
+                'supplier': 2,
+                'supplier_name': 'Koktel Ugostiteljstvo d.o.o.',
+                'status': 'created',
+                'status_display': 'Kreirana',
+                'payment_type': 6,
+                'payment_type_name': 'Gotovina',
+                'ordered_at': '2026-04-01T00:00:00Z',
+                'total_gross': '2.29',
+                'items': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 7,
+                    'artikl': 77,
+                    'artikl_name': 'Rucnici Kuhinjski Teta Violeta 2/1',
+                    'quantity': '1.0000',
+                    'unit_of_measure': 1,
+                    'unit_name': 'Paket',
+                    'price': '2.29',
+                    'received_quantity': '0.0000',
+                    'remaining_quantity': '1.0000',
+                    'base_group': '',
+                  },
+                ],
+              });
+            },
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      const initialOrder = PurchaseOrder(
+        id: 143,
+        reference: '143',
+        supplierId: 0,
+        status: 'created',
+        statusLabel: 'Kreirana',
+        supplierName: 'Koktel Ugostiteljstvo d.o.o.',
+        paymentTypeId: 5,
+        paymentTypeName: 'American',
+        totalAmount: 2.29,
+        currency: 'EUR',
+        orderedAt: null,
+        lines: <PurchaseOrderLine>[
+          PurchaseOrderLine(
+            id: 7,
+            articleId: 77,
+            articleName: 'Rucnici Kuhinjski Teta Violeta 2/1',
+            unitOfMeasureId: 1,
+            unitName: 'Paket',
+            baseGroup: '',
+            quantity: 1,
+            receivedQuantity: 0,
+            remainingQuantity: 1,
+            unitPrice: 2.29,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+            initialOrder: initialOrder,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gotovina').last);
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('po-form-save')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('po-form-save')));
+      await tester.pumpAndSettle();
+
+      final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+      expect(body['supplier'], 2);
+      expect(body['payment_type'], 6);
+    },
+  );
+
+  testWidgets(
     'requires re-selecting supplier when autocomplete text is edited',
     (tester) async {
       final repository = PurchaseOrderRepository(
