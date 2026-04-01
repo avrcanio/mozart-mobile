@@ -548,7 +548,7 @@ class _EditableOrderLineCardState extends State<_EditableOrderLineCard> {
                 widget.onChanged(widget.line.copyWith(quantityText: value));
               },
               validator: (value) {
-                final parsed = double.tryParse((value ?? '').trim());
+                final parsed = _parseLocalizedDecimal(value ?? '');
                 if (parsed == null || parsed <= 0) {
                   return 'Unesite kolicinu.';
                 }
@@ -600,13 +600,15 @@ class _EditableOrderLine {
   final String quantityText;
   final String priceText;
 
-  double? get parsedPrice => double.tryParse(priceText.trim());
+  double? get parsedQuantity => _parseLocalizedDecimal(quantityText);
+
+  double? get parsedPrice => _parseLocalizedDecimal(priceText);
 
   bool get isComplete =>
       articleId > 0 &&
       unitOfMeasureId > 0 &&
-      double.tryParse(quantityText.trim()) != null &&
-      double.parse(quantityText.trim()) > 0;
+      parsedQuantity != null &&
+      parsedQuantity! > 0;
 
   _EditableOrderLine copyWith({
     int? id,
@@ -629,12 +631,15 @@ class _EditableOrderLine {
   }
 
   Map<String, dynamic> toPayload() {
+    final normalizedQuantity = _normalizeDecimalString(quantityText);
+    final normalizedPrice = _normalizeDecimalString(priceText);
+
     return <String, dynamic>{
       if (id != null && id! > 0) 'id': id,
       'artikl': articleId,
-      'quantity': quantityText.trim(),
+      'quantity': normalizedQuantity,
       'unit_of_measure': unitOfMeasureId,
-      if (priceText.trim().isNotEmpty) 'price': priceText.trim(),
+      if (normalizedPrice.isNotEmpty) 'price': normalizedPrice,
     };
   }
 
@@ -682,4 +687,16 @@ String _formatDateInput(DateTime? value) {
     return '';
   }
   return DateFormat('yyyy-MM-dd').format(value.toLocal());
+}
+
+double? _parseLocalizedDecimal(String value) {
+  final normalized = _normalizeDecimalString(value);
+  if (normalized.isEmpty) {
+    return null;
+  }
+  return double.tryParse(normalized);
+}
+
+String _normalizeDecimalString(String value) {
+  return value.trim().replaceAll(',', '.');
 }

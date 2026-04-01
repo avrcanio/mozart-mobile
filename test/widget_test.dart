@@ -890,6 +890,111 @@ void main() {
       ),
     );
   });
+
+  testWidgets('accepts Croatian decimal input in purchase order form', (
+    tester,
+  ) async {
+    ApiRequest? capturedRequest;
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+          ]),
+          'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 5, 'name': 'Virman'},
+          ]),
+          'GET /api/suppliers/2/artikli/': _jsonListResponse(
+            <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 77,
+                'artikl_name': 'Coffee beans',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.50',
+              },
+            ],
+          ),
+          'POST /api/purchase-orders/': (ApiRequest request) {
+            capturedRequest = request;
+            return _jsonResponse(<String, dynamic>{
+              'id': 91,
+              'reference': 'PO-NEW',
+              'supplier': 2,
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type': 5,
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-05T09:30:00Z',
+              'total_gross': '120.00',
+              'items': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 1,
+                  'artikl': 77,
+                  'artikl_name': 'Coffee beans',
+                  'quantity': '1.5000',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kg',
+                  'price': '12.50',
+                  'received_quantity': '0.0000',
+                  'remaining_quantity': '1.5000',
+                  'base_group': '',
+                },
+              ],
+            });
+          },
+        }),
+      ),
+    );
+
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildMozartTheme(),
+        home: PurchaseOrderFormScreen(
+          session: session,
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-form-supplier')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Blue Harbor Supply').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-form-payment-type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Virman').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Dodaj stavku'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('po-line-0-quantity')), '1,5');
+    await tester.enterText(find.byKey(const Key('po-line-0-price')), '12,50');
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('po-form-save')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('po-form-save')));
+    await tester.pumpAndSettle();
+
+    final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+    expect((body['items'] as List).single['quantity'], '1.5');
+    expect((body['items'] as List).single['price'], '12.50');
+  });
 }
 
 Future<_Harness> _createHarness({
