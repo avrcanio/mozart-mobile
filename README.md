@@ -20,7 +20,7 @@ Flutter MVP scaffold for issue `#1`, based on the migration brief from the exist
 - `GET /api/me/` for current user details
 - Existing mailbox and purchase order endpoints remain the source of truth
 
-The app now performs real token-based auth and backend requests, but token persistence is still in-memory until secure device storage is added.
+The app now performs real token-based auth and backend requests, with secure device storage for session persistence.
 
 ## Run
 
@@ -38,7 +38,10 @@ flutter run --dart-define=MOZART_API_BASE_URL=https://your-backend.example.com
 
 ## Next implementation steps
 
-- Replace in-memory auth storage with secure device storage
-- Add purchase order create/edit forms around the existing mutation endpoints
+- Expand purchase-order workflow coverage with more mutation paths
+- Add integration-style coverage around create/edit/send flows
 - Confirm logout semantics for token invalidation vs local sign-out
-- Expand mailbox detail and purchase-order detail screens beyond the current list/detail shell
+
+## CI
+
+GitHub Actions runs `flutter analyze` and `flutter test` automatically on pushes to `main` and on pull requests via [.github/workflows/flutter-ci.yml](C:/Users/avrca/Documents/Projects/mozart-mobile/.github/workflows/flutter-ci.yml).
