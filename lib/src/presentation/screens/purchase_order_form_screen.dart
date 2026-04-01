@@ -45,6 +45,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
   List<SupplierArticleDto> _articles = const <SupplierArticleDto>[];
 
   int? _selectedSupplierId;
+  String? _selectedSupplierName;
   int? _selectedPaymentTypeId;
   DateTime? _orderedAt;
   late List<_EditableOrderLine> _lines;
@@ -58,6 +59,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
             .toList() ??
         <_EditableOrderLine>[];
     _selectedSupplierId = widget.initialOrder?.supplierId;
+    _selectedSupplierName = widget.initialOrder?.supplierName;
     _selectedPaymentTypeId = widget.initialOrder?.paymentTypeId;
     _orderedAt = widget.initialOrder?.orderedAt ?? DateTime.now();
     _dateController.text = _formatDateInput(_orderedAt);
@@ -137,8 +139,13 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
         _suppliers = suppliers;
         _paymentTypes = paymentTypes;
         _articles = articles;
-        _supplierController.text =
-            _selectedSupplier?.name ?? widget.initialOrder?.supplierName ?? '';
+        final supplierName =
+            _selectedSupplier?.name ??
+            _selectedSupplierName ??
+            widget.initialOrder?.supplierName ??
+            '';
+        _selectedSupplierName = supplierName.isEmpty ? null : supplierName;
+        _supplierController.text = supplierName;
         _isLoading = false;
       });
     } catch (_) {
@@ -194,14 +201,16 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
   }
 
   void _handleSupplierTextChanged(FormFieldState<int> field, String value) {
-    final selectedSupplier = _selectedSupplier;
-    if (selectedSupplier != null && selectedSupplier.name == value) {
-      field.didChange(selectedSupplier.id);
+    final supplierName = value.trim();
+    final confirmedSupplierName = _selectedSupplierName?.trim();
+    if (confirmedSupplierName != null && confirmedSupplierName == supplierName) {
+      field.didChange(_selectedSupplierId);
       return;
     }
     if (_selectedSupplierId != null) {
       setState(() {
         _selectedSupplierId = null;
+        _selectedSupplierName = null;
       });
     }
     field.didChange(null);
@@ -214,6 +223,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     final previousSupplierId = _selectedSupplierId;
     setState(() {
       _selectedSupplierId = supplier.id;
+      _selectedSupplierName = supplier.name;
       _supplierController.value = TextEditingValue(
         text: supplier.name,
         selection: TextSelection.collapsed(offset: supplier.name.length),
@@ -409,15 +419,14 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                         initialValue: _selectedSupplierId,
                         validator: (_) {
                           final supplierName = _supplierController.text.trim();
-                          final selectedSupplier = _selectedSupplier;
                           if (supplierName.isEmpty) {
                             return 'Odaberite dobavlja\u010Da.';
                           }
                           if (_selectedSupplierId == null) {
                             return 'Odaberite dobavlja\u010Da iz popisa.';
                           }
-                          if (selectedSupplier == null ||
-                              selectedSupplier.name != supplierName) {
+                          if ((_selectedSupplierName?.trim() ?? '') !=
+                              supplierName) {
                             return 'Odaberite dobavlja\u010Da iz popisa.';
                           }
                           return null;

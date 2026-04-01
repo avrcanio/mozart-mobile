@@ -4155,6 +4155,257 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
   });
 
   testWidgets(
+    'preserves selected supplier when editing only payment type',
+    (tester) async {
+      ApiRequest? capturedRequest;
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+              <String, dynamic>{'id': 6, 'name': 'Gotovina'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 77,
+                  'artikl_name': 'Coffee beans',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kg',
+                  'price': '13.00',
+                },
+              ],
+            ),
+            'PUT /api/purchase-orders/44/': (ApiRequest request) {
+              capturedRequest = request;
+              return _jsonResponse(<String, dynamic>{
+                'id': 44,
+                'reference': 'PO-EDIT',
+                'supplier': 2,
+                'supplier_name': 'Blue Harbor Supply',
+                'status': 'created',
+                'status_display': 'Kreirana',
+                'payment_type': 6,
+                'payment_type_name': 'Gotovina',
+                'ordered_at': '2026-04-05T09:30:00Z',
+                'total_gross': '130.00',
+                'items': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 7,
+                    'artikl': 77,
+                    'artikl_name': 'Coffee beans',
+                    'quantity': '4.0000',
+                    'unit_of_measure': 1,
+                    'unit_name': 'kg',
+                    'price': '13.00',
+                    'received_quantity': '0.0000',
+                    'remaining_quantity': '4.0000',
+                    'base_group': '',
+                  },
+                ],
+              });
+            },
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      const initialOrder = PurchaseOrder(
+        id: 44,
+        reference: 'PO-EDIT',
+        supplierId: 2,
+        status: 'created',
+        statusLabel: 'Kreirana',
+        supplierName: 'Blue Harbor Supply',
+        paymentTypeId: 5,
+        paymentTypeName: 'Virman',
+        totalAmount: 130,
+        currency: 'EUR',
+        orderedAt: null,
+        lines: <PurchaseOrderLine>[
+          PurchaseOrderLine(
+            id: 7,
+            articleId: 77,
+            articleName: 'Coffee beans',
+            unitOfMeasureId: 1,
+            unitName: 'kg',
+            baseGroup: '',
+            quantity: 4,
+            receivedQuantity: 0,
+            remainingQuantity: 4,
+            unitPrice: 13,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+            initialOrder: initialOrder,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gotovina').last);
+      await tester.pumpAndSettle();
+
+      final supplierField = tester.widget<TextFormField>(
+        find.byKey(const Key('po-form-supplier')),
+      );
+      expect(supplierField.controller!.text, 'Blue Harbor Supply');
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('po-form-save')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('po-form-save')));
+      await tester.pumpAndSettle();
+
+      final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+      expect(body['supplier'], 2);
+      expect(body['payment_type'], 6);
+      expect(find.textContaining('supplier:'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'preserves initial supplier outside lookup list when editing purchase order',
+    (tester) async {
+      ApiRequest? capturedRequest;
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 9, 'name': 'Coffee Logistics'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+              <String, dynamic>{'id': 6, 'name': 'Gotovina'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'PUT /api/purchase-orders/44/': (ApiRequest request) {
+              capturedRequest = request;
+              return _jsonResponse(<String, dynamic>{
+                'id': 44,
+                'reference': 'PO-EDIT',
+                'supplier': 2,
+                'supplier_name': 'Blue Harbor Supply',
+                'status': 'created',
+                'status_display': 'Kreirana',
+                'payment_type': 6,
+                'payment_type_name': 'Gotovina',
+                'ordered_at': '2026-04-05T09:30:00Z',
+                'total_gross': '130.00',
+                'items': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 7,
+                    'artikl': 77,
+                    'artikl_name': 'Historical item',
+                    'quantity': '4.0000',
+                    'unit_of_measure': 1,
+                    'unit_name': 'kg',
+                    'price': '13.00',
+                    'received_quantity': '0.0000',
+                    'remaining_quantity': '4.0000',
+                    'base_group': '',
+                  },
+                ],
+              });
+            },
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      const initialOrder = PurchaseOrder(
+        id: 44,
+        reference: 'PO-EDIT',
+        supplierId: 2,
+        status: 'created',
+        statusLabel: 'Kreirana',
+        supplierName: 'Blue Harbor Supply',
+        paymentTypeId: 5,
+        paymentTypeName: 'Virman',
+        totalAmount: 130,
+        currency: 'EUR',
+        orderedAt: null,
+        lines: <PurchaseOrderLine>[
+          PurchaseOrderLine(
+            id: 7,
+            articleId: 77,
+            articleName: 'Historical item',
+            unitOfMeasureId: 1,
+            unitName: 'kg',
+            baseGroup: '',
+            quantity: 4,
+            receivedQuantity: 0,
+            remainingQuantity: 4,
+            unitPrice: 13,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+            initialOrder: initialOrder,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final supplierField = tester.widget<TextFormField>(
+        find.byKey(const Key('po-form-supplier')),
+      );
+      expect(supplierField.controller!.text, 'Blue Harbor Supply');
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gotovina').last);
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('po-form-save')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('po-form-save')));
+      await tester.pumpAndSettle();
+
+      final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+      expect(body['supplier'], 2);
+      expect(body['payment_type'], 6);
+    },
+  );
+
+  testWidgets(
     'requires re-selecting supplier when autocomplete text is edited',
     (tester) async {
       final repository = PurchaseOrderRepository(
