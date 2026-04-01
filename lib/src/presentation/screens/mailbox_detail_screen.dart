@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/mailbox/mailbox_repository.dart';
 import '../../domain/mail_message_detail.dart';
@@ -12,12 +13,14 @@ class MailboxDetailScreen extends StatelessWidget {
     required this.messageId,
     required this.session,
     required this.repository,
+    this.attachmentLauncher = _launchAttachmentUrl,
     super.key,
   });
 
   final int messageId;
   final UserSession session;
   final MailboxRepository repository;
+  final AttachmentLauncher attachmentLauncher;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +35,7 @@ class MailboxDetailScreen extends StatelessWidget {
             messageId: messageId,
             session: session,
             repository: repository,
+            attachmentLauncher: attachmentLauncher,
           ),
         ),
       ),
@@ -44,6 +48,7 @@ class MailboxDetailPane extends StatefulWidget {
     required this.messageId,
     required this.session,
     required this.repository,
+    this.attachmentLauncher = _launchAttachmentUrl,
     this.showRefreshAction = true,
     super.key,
   });
@@ -51,6 +56,7 @@ class MailboxDetailPane extends StatefulWidget {
   final int messageId;
   final UserSession session;
   final MailboxRepository repository;
+  final AttachmentLauncher attachmentLauncher;
   final bool showRefreshAction;
 
   @override
@@ -104,6 +110,7 @@ class _MailboxDetailPaneState extends State<MailboxDetailPane> {
             child: _MailboxDetailBody(
               state: state,
               onRetry: _load,
+              attachmentLauncher: widget.attachmentLauncher,
             ),
           ),
         ],
@@ -116,10 +123,12 @@ class _MailboxDetailBody extends StatelessWidget {
   const _MailboxDetailBody({
     required this.state,
     required this.onRetry,
+    required this.attachmentLauncher,
   });
 
   final MailboxDetailState state;
   final VoidCallback onRetry;
+  final AttachmentLauncher attachmentLauncher;
 
   @override
   Widget build(BuildContext context) {
@@ -247,7 +256,10 @@ class _MailboxDetailBody extends StatelessWidget {
                   ...message.attachments.map(
                     (attachment) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _AttachmentCard(attachment: attachment),
+                      child: _AttachmentCard(
+                        attachment: attachment,
+                        attachmentLauncher: attachmentLauncher,
+                      ),
                     ),
                   ),
               ],
@@ -260,9 +272,13 @@ class _MailboxDetailBody extends StatelessWidget {
 }
 
 class _AttachmentCard extends StatelessWidget {
-  const _AttachmentCard({required this.attachment});
+  const _AttachmentCard({
+    required this.attachment,
+    required this.attachmentLauncher,
+  });
 
   final MailAttachment attachment;
+  final AttachmentLauncher attachmentLauncher;
 
   @override
   Widget build(BuildContext context) {
@@ -292,24 +308,75 @@ class _AttachmentCard extends StatelessWidget {
             const SizedBox(height: 8),
             SelectableText(attachment.fileUrl),
             const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: attachment.fileUrl));
-                if (!context.mounted) {
-                  return;
-                }
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Link priloga je kopiran.')),
-                );
-              },
-              icon: const Icon(Icons.link),
-              label: const Text('Kopiraj link'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _openAttachment(context),
+                  icon: const Icon(Icons.download_outlined),
+                  label: const Text('Otvori prilog'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _copyAttachmentLink(context),
+                  icon: const Icon(Icons.link),
+                  label: const Text('Kopiraj link'),
+                ),
+              ],
             ),
           ],
         ],
       ),
     );
   }
+
+  Future<void> _openAttachment(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final uri = Uri.tryParse(attachment.fileUrl);
+    if (uri == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Link priloga nije valjan.')),
+      );
+      return;
+    }
+
+    final opened = await attachmentLauncher(uri);
+    if (!context.mounted) {
+      return;
+    }
+
+    if (opened) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Prilog se otvara u vanjskoj aplikaciji.')),
+      );
+      return;
+    }
+
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Prilog nije moguce otvoriti. Kopirajte link i pokusajte ponovno.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copyAttachmentLink(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: attachment.fileUrl));
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Link priloga je kopiran.')),
+    );
+  }
+}
+
+typedef AttachmentLauncher = Future<bool> Function(Uri uri);
+
+Future<bool> _launchAttachmentUrl(Uri uri) {
+  return launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
 class _DetailRow extends StatelessWidget {

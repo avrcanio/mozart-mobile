@@ -15,6 +15,7 @@ import 'package:mozart_mobile/src/domain/purchase_order.dart';
 import 'package:mozart_mobile/src/domain/user_session.dart';
 import 'package:mozart_mobile/src/presentation/app_services_scope.dart';
 import 'package:mozart_mobile/src/presentation/app_view.dart';
+import 'package:mozart_mobile/src/presentation/screens/mailbox_detail_screen.dart';
 import 'package:mozart_mobile/src/presentation/session_scope.dart';
 import 'package:mozart_mobile/src/presentation/screens/purchase_order_form_screen.dart';
 
@@ -334,7 +335,148 @@ void main() {
     expect(find.text('Detalji ponude za tjednu nabavu.'), findsOneWidget);
     expect(find.text('manager@mozart.local'), findsOneWidget);
     expect(find.text('ponuda.pdf'), findsOneWidget);
+    expect(find.text('Otvori prilog'), findsOneWidget);
     expect(find.text('Kopiraj link'), findsOneWidget);
+  });
+
+  testWidgets('opens mailbox attachment via injected launcher', (tester) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    Uri? openedUri;
+    final repository = MailboxRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/mailbox/messages/700/': _jsonResponse(<String, dynamic>{
+            'id': 700,
+            'subject': 'Nova ponuda',
+            'from_email': 'nabava@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'cc_emails': 'manager@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'body_text': 'Detalji ponude za tjednu nabavu.',
+            'attachments': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 1,
+                'filename': 'ponuda.pdf',
+                'content_type': 'application/pdf',
+                'size': 2048,
+                'file_url': 'https://example.test/media/ponuda.pdf',
+              },
+            ],
+          }),
+        }),
+      ),
+    );
+
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildMozartTheme(),
+        home: MailboxDetailScreen(
+          messageId: 700,
+          session: session,
+          repository: repository,
+          attachmentLauncher: (uri) async {
+            openedUri = uri;
+            return true;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final openAttachmentButton = find.widgetWithText(
+      FilledButton,
+      'Otvori prilog',
+    );
+    await tester.ensureVisible(openAttachmentButton);
+    await tester.tap(openAttachmentButton);
+    await tester.pumpAndSettle();
+
+    expect(openedUri, Uri.parse('https://example.test/media/ponuda.pdf'));
+    expect(
+      find.text('Prilog se otvara u vanjskoj aplikaciji.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shows fallback snackbar when mailbox attachment cannot be opened', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = MailboxRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/mailbox/messages/701/': _jsonResponse(<String, dynamic>{
+            'id': 701,
+            'subject': 'Nova ponuda',
+            'from_email': 'nabava@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'body_text': 'Detalji ponude za tjednu nabavu.',
+            'attachments': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 1,
+                'filename': 'ponuda.pdf',
+                'content_type': 'application/pdf',
+                'size': 2048,
+                'file_url': 'https://example.test/media/ponuda.pdf',
+              },
+            ],
+          }),
+        }),
+      ),
+    );
+
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildMozartTheme(),
+        home: MailboxDetailScreen(
+          messageId: 701,
+          session: session,
+          repository: repository,
+          attachmentLauncher: (_) async => false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final openAttachmentButton = find.widgetWithText(
+      FilledButton,
+      'Otvori prilog',
+    );
+    await tester.ensureVisible(openAttachmentButton);
+    await tester.tap(openAttachmentButton);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Prilog nije moguce otvoriti. Kopirajte link i pokusajte ponovno.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('uses html fallback messaging in mailbox detail when body text is missing', (
