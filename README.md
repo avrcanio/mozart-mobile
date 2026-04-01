@@ -1,53 +1,67 @@
-# Mozart Mobile
+# Ordino
 
-Flutter MVP scaffold for issue `#1`, based on the migration brief from the existing web frontend to a mobile-first client over the same Django API.
+<p align="center">
+  <img src="assets/branding/app_mark.png" alt="Ordino app mark" width="180">
+</p>
 
-## Scope implemented
+Mobile purchase, mailbox, and dashboard client for the Mozart backend, now branded as `Ordino`.
 
-- Flutter project bootstrap for Android and iOS
-- Layered app structure:
-  - `lib/src/data`
-  - `lib/src/domain`
-  - `lib/src/presentation`
-- Token-auth oriented login shell
-- Dashboard, mailbox, and purchase orders MVP screens
-- Purchase order split-view detail layout on wide screens
-- Warm visual theme that matches the issue direction better than a default Material seed app
+## Overview
 
-## Current backend contract assumptions
+- Flutter app for Android and iOS
+- Native app identity: `hr.finestar.ordino`
+- Token-based authentication against the existing Django API
+- Dashboard, mailbox, and purchase-order workflows
+- Secure session persistence with `flutter_secure_storage`
+- CI on `push` to `main` and `pull_request`
 
-- `POST /api/token/` for login
-- `GET /api/me/` for current user details
-- Existing mailbox and purchase order endpoints remain the source of truth
-- Logout currently relies on local secure-storage sign-out. The mobile client is ready for optional backend token invalidation when a dedicated logout endpoint is exposed.
+## Project Structure
 
-The app now performs real token-based auth and backend requests, with secure device storage for session persistence.
+- `lib/src/data` API clients, DTOs, repositories
+- `lib/src/domain` app models and business entities
+- `lib/src/presentation` screens, controllers, app shell
+- `test/widget_test.dart` widget and flow coverage
 
-## Run
+## Backend Contract
+
+- `POST /api/token/` login
+- `GET /api/me/` current user
+- Mailbox endpoints under `/api/mailbox/messages/`
+- Purchase-order endpoints under `/api/purchase-orders/`
+
+Default API base URL:
 
 ```bash
-flutter run
+https://mozart.sibenik1983.hr
 ```
 
-Default API base URL: `https://mozart.sibenik1983.hr`
-
-Override the API base URL when needed:
+Override it when needed:
 
 ```bash
 flutter run --dart-define=MOZART_API_BASE_URL=https://your-backend.example.com
 ```
 
-## Logout semantics
+## Run
 
-- Current production behavior is intentional local sign-out: the stored token is removed from device secure storage and the app returns to the login screen immediately.
-- The auth repository also supports optional backend logout invalidation when a dedicated endpoint is configured later.
-- If backend invalidation is unavailable or fails, local sign-out still completes so the operator is not left in a broken logout state.
+```bash
+flutter pub get
+flutter run
+```
 
-## Next implementation steps
+## Verification
 
-- Expand purchase-order workflow coverage with more mutation paths
-- Add integration-style coverage around create/edit/send flows
+```bash
+flutter analyze
+flutter test
+```
+
+## Notes
+
+- Logout clears the locally stored token immediately and can optionally call a backend logout endpoint when configured.
+- Android 12+ splash behavior is still constrained by the platform splash API masking rules.
 
 ## CI
 
-GitHub Actions runs `flutter analyze` and `flutter test` automatically on pushes to `main` and on pull requests via [.github/workflows/flutter-ci.yml](C:/Users/avrca/Documents/Projects/mozart-mobile/.github/workflows/flutter-ci.yml).
+GitHub Actions workflow:
+
+- `.github/workflows/flutter-ci.yml`

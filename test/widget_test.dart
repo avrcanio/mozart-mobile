@@ -6,23 +6,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:mozart_mobile/src/core/theme/app_theme.dart';
-import 'package:mozart_mobile/src/data/auth/auth_repository.dart';
-import 'package:mozart_mobile/src/data/auth/auth_storage.dart';
-import 'package:mozart_mobile/src/data/dashboard/dashboard_repository.dart';
-import 'package:mozart_mobile/src/data/http/api_client.dart';
-import 'package:mozart_mobile/src/data/mailbox/mailbox_repository.dart';
-import 'package:mozart_mobile/src/data/purchase_orders/purchase_order_repository.dart';
-import 'package:mozart_mobile/src/domain/purchase_order.dart';
-import 'package:mozart_mobile/src/domain/user_session.dart';
-import 'package:mozart_mobile/src/presentation/app_services_scope.dart';
-import 'package:mozart_mobile/src/presentation/app_view.dart';
-import 'package:mozart_mobile/src/presentation/connectivity_feedback.dart';
-import 'package:mozart_mobile/src/presentation/screens/mailbox_detail_screen.dart';
-import 'package:mozart_mobile/src/presentation/screens/purchase_order_detail_screen.dart';
-import 'package:mozart_mobile/src/presentation/session_scope.dart';
-import 'package:mozart_mobile/src/presentation/screens/purchase_order_receipt_screen.dart';
-import 'package:mozart_mobile/src/presentation/screens/purchase_order_form_screen.dart';
+import 'package:ordino/src/core/theme/app_theme.dart';
+import 'package:ordino/src/data/auth/auth_repository.dart';
+import 'package:ordino/src/data/auth/auth_storage.dart';
+import 'package:ordino/src/data/dashboard/dashboard_repository.dart';
+import 'package:ordino/src/data/http/api_client.dart';
+import 'package:ordino/src/data/mailbox/mailbox_repository.dart';
+import 'package:ordino/src/data/purchase_orders/purchase_order_repository.dart';
+import 'package:ordino/src/domain/purchase_order.dart';
+import 'package:ordino/src/domain/user_session.dart';
+import 'package:ordino/src/presentation/app_services_scope.dart';
+import 'package:ordino/src/presentation/app_view.dart';
+import 'package:ordino/src/presentation/connectivity_feedback.dart';
+import 'package:ordino/src/presentation/screens/mailbox_detail_screen.dart';
+import 'package:ordino/src/presentation/screens/purchase_order_detail_screen.dart';
+import 'package:ordino/src/presentation/session_scope.dart';
+import 'package:ordino/src/presentation/screens/purchase_order_receipt_screen.dart';
+import 'package:ordino/src/presentation/screens/purchase_order_form_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -39,7 +39,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pump();
 
-    expect(find.text('Mozart Mobile'), findsOneWidget);
+    expect(find.text('Ordino'), findsOneWidget);
     expect(find.text('Prijava'), findsOneWidget);
   });
 
@@ -142,7 +142,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Mozart Mobile'), findsNothing);
+    expect(find.text('Ordino'), findsNothing);
     expect(find.text('Pregled najvaznijih obaveza i stanja za danasnji rad.'), findsNothing);
     expect(find.text('Brzi pregled'), findsNothing);
     expect(find.byKey(const Key('home-avatar-menu')), findsOneWidget);

@@ -57,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Mozart Mobile',
+                                'Ordino',
                                 style: theme.textTheme.displaySmall,
                               ),
                               const SizedBox(height: 12),

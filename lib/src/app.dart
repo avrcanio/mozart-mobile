@@ -67,7 +67,7 @@ class _MozartMobileAppState extends State<MozartMobileApp> {
       child: SessionScope(
         controller: _sessionController,
         child: MaterialApp(
-          title: 'Mozart Mobile',
+          title: 'Ordino',
           theme: buildMozartTheme(),
           debugShowCheckedModeBanner: false,
           locale: const Locale('hr', 'HR'),

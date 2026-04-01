@@ -1,4 +1,4 @@
-package com.example.mozart_mobile
+package hr.finestar.ordino
 
 import io.flutter.embedding.android.FlutterActivity
 

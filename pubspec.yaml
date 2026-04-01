@@ -1,4 +1,4 @@
-name: mozart_mobile
+name: ordino
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -108,11 +108,10 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 flutter_native_splash:
-  color: "#F6F0E8"
-  image: assets/branding/app_mark.png
   android: true
   ios: true
   web: false
+  background_image: assets/branding/splash_screen.png
   android_12:
     color: "#F6F0E8"
     image: assets/branding/app_mark.png
