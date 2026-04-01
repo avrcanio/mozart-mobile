@@ -578,15 +578,10 @@ void main() {
     expect(find.textContaining('<html xmlns:v='), findsNothing);
     expect(find.textContaining('@font-face'), findsNothing);
     expect(find.byType(Image), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Prilozi (0)'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('Prilozi (0)'), findsOneWidget);
+    expect(find.textContaining('Prilozi ('), findsNothing);
   });
 
-  testWidgets('falls back to body text when html content is not renderable', (
+  testWidgets('renders cleaned plain-text html without fallback notice when content is readable', (
     tester,
   ) async {
     final harness = await _createHarness(
@@ -632,7 +627,7 @@ void main() {
           'to_emails': 'root@mozart.local',
           'sent_at': '2026-04-01T08:45:00Z',
           'body_text': 'Ovo je tekstualni fallback poruke.',
-          'body_html': '<html><head></head></html>',
+          'body_html': '<html><head></head><body>Ovo je tekstualni fallback poruke.</body></html>',
           'attachments': <Map<String, dynamic>>[],
         }),
       },
@@ -650,12 +645,98 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Detalji poruke'), findsOneWidget);
+    expect(find.text('Ovo je tekstualni fallback poruke.'), findsOneWidget);
     expect(
       find.textContaining('nije bila dovoljno cista za bogatiji prikaz'),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text('Ovo je tekstualni fallback poruke.'), findsOneWidget);
     expect(find.textContaining('<html><head>'), findsNothing);
+  });
+
+  testWidgets('does not show html fallback notice for readable quoted plain-text mail', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 9,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mail',
+          'last_name': 'User',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 703,
+            'subject': 'RE: Narudzba #117',
+            'from_email': 'narudzbe@koktel.hr',
+            'to_emails': 'narudzbe@sibenik1983.hr',
+            'sent_at': '2026-03-17T13:25:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 88,
+            'reference': 'PO-88',
+            'supplier_name': 'Warehouse One',
+            'status': 'sent',
+            'status_display': 'Sent',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/mailbox/messages/703/': _jsonResponse(<String, dynamic>{
+          'id': 703,
+          'subject': 'RE: Narudzba #117',
+          'from_email': 'Narudzbe Koktel <narudzbe@koktel.hr>',
+          'to_emails': 'Mozart Caffe Narudzbe <narudzbe@sibenik1983.hr>',
+          'sent_at': '2026-03-17T13:25:00Z',
+          'body_text': '''
+Nema hidre vital još uvijek....
+
+-----Izvorna poruka-----
+Pošiljatelj: Mozart Caffe Narudzbe <narudzbe@sibenik1983.hr>
+Poslano: 17. ožujka 2026. 13:23
+Primatelj: Narudzbe Koktel <narudzbe@koktel.hr>
+Predmet: Narudzba #117
+
+U prilogu se nalazi narudzba 117.
+
+Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sibenik1983.hr/orders/confirm/Gb_4CbpUCV8O558Wo7gWUtVFXIVLw_micp6YylWOVds/
+          ''',
+          'body_html': '<html><head></head><body></body></html>',
+          'attachments': <Map<String, dynamic>>[],
+        }),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(_navigationDestinationFinder('Poruke'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('RE: Narudzba #117'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detalji poruke'), findsOneWidget);
+    expect(find.textContaining('Nema hidre vital'), findsOneWidget);
+    expect(find.textContaining('mozart.sibenik1983.hr/orders/confirm/'), findsOneWidget);
+    expect(
+      find.textContaining('nije bila dovoljno cista za bogatiji prikaz'),
+      findsNothing,
+    );
+    expect(find.textContaining('Prilozi ('), findsNothing);
+    expect(find.text('Poruka nema priloga.'), findsNothing);
   });
 
   testWidgets('shows mailbox detail retry state on fetch error', (tester) async {

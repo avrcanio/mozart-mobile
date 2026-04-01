@@ -26,7 +26,9 @@ class MailMessageDetail {
   bool get hasBodyHtml => bodyHtml.trim().isNotEmpty;
   String get renderableHtmlContent => _prepareRenderableHtml(bodyHtml);
   bool get hasRenderableHtml => renderableHtmlContent.trim().isNotEmpty;
-  bool get isUsingHtmlFallback => !hasRenderableHtml && hasBodyText;
+  bool get hasDegradedHtmlFallback =>
+      hasBodyHtml && !hasRenderableHtml && !isPlainTextBodyPrimary;
+  bool get isPlainTextBodyPrimary => hasBodyText;
 
   String get bodyContent {
     if (hasRenderableHtml) {
@@ -111,6 +113,21 @@ String _prepareRenderableHtml(String html) {
   ).hasMatch(normalized);
   if (hasMeaningfulHtml) {
     return normalized;
+  }
+
+  final plainTextContent = normalized
+      .replaceAll(RegExp(r'<[^>]+>', caseSensitive: false), ' ')
+      .replaceAll(RegExp(r'&nbsp;', caseSensitive: false), ' ')
+      .replaceAll(RegExp(r'&amp;', caseSensitive: false), '&')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
+  if (plainTextContent.isNotEmpty) {
+    final escapedText = plainTextContent
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+    return '<p>$escapedText</p>';
   }
 
   return '';

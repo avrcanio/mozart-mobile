@@ -235,21 +235,19 @@ class _MailboxDetailBody extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 14),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Prilozi (${message.attachments.length})',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 14),
-                if (message.attachments.isEmpty)
-                  const Text('Poruka nema priloga.')
-                else
+        if (message.attachments.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Prilozi (${message.attachments.length})',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 14),
                   ...message.attachments.map(
                     (attachment) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
@@ -259,10 +257,11 @@ class _MailboxDetailBody extends StatelessWidget {
                       ),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -375,7 +374,7 @@ class _MailBodyFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (message.isUsingHtmlFallback) {
+    if (message.hasDegradedHtmlFallback) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
