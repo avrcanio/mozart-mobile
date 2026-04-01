@@ -121,13 +121,19 @@ class PurchaseOrderRepository {
 
   Future<void> patchItemPrice({
     required int itemId,
-    required double price,
+    required String price,
+    required String currency,
+    required String reason,
     required String authToken,
   }) async {
     await _apiClient.patchJson(
       '/api/purchase-order-items/$itemId/price/',
       authToken: authToken,
-      body: <String, dynamic>{'price': price},
+      body: <String, dynamic>{
+        'price': price,
+        'currency': currency,
+        'reason': reason,
+      },
     );
   }
 

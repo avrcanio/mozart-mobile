@@ -1595,6 +1595,331 @@ void main() {
     expect(find.text('Zaprimanje robe'), findsNothing);
   });
 
+  testWidgets('updates purchase order item price and refreshes totals', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    ApiRequest? capturedRequest;
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Ana',
+          'last_name': 'Admin',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 2048,
+            'reference': 'PO-2048',
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-02T11:30:00Z',
+            'total_gross': '120.00',
+            'total_net': '96.00',
+            'items': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 7,
+                'artikl': 77,
+                'artikl_name': 'Coffee beans',
+                'quantity': '10.0000',
+                'received_quantity': '0.0000',
+                'remaining_quantity': '10.0000',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.00',
+              },
+            ],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 2048,
+              'reference': 'PO-2048',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-02T11:30:00Z',
+              'total_gross': '120.00',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/2048/': <_FakeResponse>[
+          _jsonResponse(<String, dynamic>{
+            'id': 2048,
+            'reference': 'PO-2048',
+            'supplier': 2,
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type': 5,
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-02T11:30:00Z',
+            'currency': 'EUR',
+            'total_net': '96.00',
+            'total_gross': '120.00',
+            'items': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 7,
+                'artikl': 77,
+                'artikl_name': 'Coffee beans',
+                'quantity': '10.0000',
+                'received_quantity': '0.0000',
+                'remaining_quantity': '10.0000',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.00',
+                'base_group': '',
+              },
+            ],
+          }),
+          _jsonResponse(<String, dynamic>{
+            'id': 2048,
+            'reference': 'PO-2048',
+            'supplier': 2,
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type': 5,
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-02T11:30:00Z',
+            'currency': 'EUR',
+            'total_net': '112.00',
+            'total_gross': '140.00',
+            'items': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 7,
+                'artikl': 77,
+                'artikl_name': 'Coffee beans',
+                'quantity': '10.0000',
+                'received_quantity': '0.0000',
+                'remaining_quantity': '10.0000',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '14.00',
+                'base_group': '',
+              },
+            ],
+          }),
+        ],
+        'PATCH /api/purchase-order-items/7/price/': (ApiRequest request) {
+          capturedRequest = request;
+          return _jsonResponse(<String, dynamic>{
+            'purchase_order_item_id': 7,
+            'old_price': '12.00',
+            'new_price': '14.00',
+            'audit': <String, dynamic>{'reason': 'Supplier correction'},
+            'po_totals': <String, dynamic>{
+              'total_net': '112.00',
+              'total_gross': '140.00',
+            },
+          });
+        },
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('PO-2048').first);
+    await tester.pumpAndSettle();
+
+    final auditButton = find.widgetWithText(
+      OutlinedButton,
+      'Korigiraj cijenu',
+    );
+    await tester.ensureVisible(auditButton);
+    await tester.tap(auditButton);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-price-audit-price')),
+      '14,00',
+    );
+    await tester.enterText(
+      find.byKey(const Key('po-price-audit-reason')),
+      'Supplier correction',
+    );
+    await tester.tap(find.byKey(const Key('po-price-audit-submit')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+    expect(body['price'], '14.00');
+    expect(body['currency'], 'EUR');
+    expect(body['reason'], 'Supplier correction');
+
+    expect(find.text('Cijena stavke je uspjesno azurirana.'), findsOneWidget);
+    expect(find.textContaining('EUR 140,00'), findsWidgets);
+    expect(find.textContaining('EUR 14,00'), findsWidgets);
+  });
+
+  testWidgets('shows backend validation error when item price audit fails', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Ana',
+          'last_name': 'Admin',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 2049,
+            'reference': 'PO-2049',
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-02T11:30:00Z',
+            'total_gross': '120.00',
+            'items': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 8,
+                'artikl': 77,
+                'artikl_name': 'Coffee beans',
+                'quantity': '10.0000',
+                'received_quantity': '0.0000',
+                'remaining_quantity': '10.0000',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.00',
+              },
+            ],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 2049,
+              'reference': 'PO-2049',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-02T11:30:00Z',
+              'total_gross': '120.00',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/2049/': _jsonResponse(<String, dynamic>{
+          'id': 2049,
+          'reference': 'PO-2049',
+          'supplier': 2,
+          'supplier_name': 'Blue Harbor Supply',
+          'status': 'created',
+          'status_display': 'Kreirana',
+          'payment_type': 5,
+          'payment_type_name': 'Virman',
+          'ordered_at': '2026-04-02T11:30:00Z',
+          'currency': 'EUR',
+          'total_net': '96.00',
+          'total_gross': '120.00',
+          'items': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 8,
+              'artikl': 77,
+              'artikl_name': 'Coffee beans',
+              'quantity': '10.0000',
+              'received_quantity': '0.0000',
+              'remaining_quantity': '10.0000',
+              'unit_of_measure': 1,
+              'unit_name': 'kg',
+              'price': '12.00',
+              'base_group': '',
+            },
+          ],
+        }),
+        'PATCH /api/purchase-order-items/8/price/': _FakeResponse(
+          statusCode: 400,
+          body: jsonEncode(<String, dynamic>{
+            'reason': <String>['Reason is required for this audit action.'],
+          }),
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('PO-2049').first);
+    await tester.pumpAndSettle();
+
+    final auditButton = find.widgetWithText(
+      OutlinedButton,
+      'Korigiraj cijenu',
+    );
+    await tester.ensureVisible(auditButton);
+    await tester.tap(auditButton);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-price-audit-price')),
+      '13,50',
+    );
+    await tester.enterText(
+      find.byKey(const Key('po-price-audit-reason')),
+      'Supplier mismatch',
+    );
+    await tester.tap(find.byKey(const Key('po-price-audit-submit')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('reason: Reason is required for this audit action.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'edits purchase order safely when historical article is missing from supplier lookup',
     (tester) async {

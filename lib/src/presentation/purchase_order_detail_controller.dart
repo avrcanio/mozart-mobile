@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../data/http/api_client.dart';
 import '../data/purchase_orders/purchase_order_repository.dart';
 import '../domain/purchase_order.dart';
 
@@ -7,6 +8,8 @@ class PurchaseOrderDetailState {
   const PurchaseOrderDetailState({
     required this.isLoading,
     required this.isSending,
+    required this.isUpdatingPrice,
+    required this.activePriceItemId,
     required this.order,
     required this.errorMessage,
     required this.actionMessage,
@@ -16,6 +19,8 @@ class PurchaseOrderDetailState {
   const PurchaseOrderDetailState.initial()
       : isLoading = false,
         isSending = false,
+        isUpdatingPrice = false,
+        activePriceItemId = null,
         order = null,
         errorMessage = null,
         actionMessage = null,
@@ -23,6 +28,8 @@ class PurchaseOrderDetailState {
 
   final bool isLoading;
   final bool isSending;
+  final bool isUpdatingPrice;
+  final int? activePriceItemId;
   final PurchaseOrder? order;
   final String? errorMessage;
   final String? actionMessage;
@@ -33,6 +40,8 @@ class PurchaseOrderDetailState {
   PurchaseOrderDetailState copyWith({
     bool? isLoading,
     bool? isSending,
+    bool? isUpdatingPrice,
+    int? activePriceItemId,
     PurchaseOrder? order,
     String? errorMessage,
     String? actionMessage,
@@ -44,6 +53,8 @@ class PurchaseOrderDetailState {
     return PurchaseOrderDetailState(
       isLoading: isLoading ?? this.isLoading,
       isSending: isSending ?? this.isSending,
+      isUpdatingPrice: isUpdatingPrice ?? this.isUpdatingPrice,
+      activePriceItemId: activePriceItemId ?? this.activePriceItemId,
       order: order ?? this.order,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       actionMessage:
@@ -122,6 +133,57 @@ class PurchaseOrderDetailController
         isSending: false,
         actionErrorMessage:
             'Slanje narudzbe nije uspjelo. Pokusajte ponovno.',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> adjustItemPrice({
+    required int orderId,
+    required int itemId,
+    required String price,
+    required String currency,
+    required String reason,
+    required String authToken,
+  }) async {
+    value = value.copyWith(
+      isUpdatingPrice: true,
+      activePriceItemId: itemId,
+      clearActionMessage: true,
+      clearActionError: true,
+    );
+    try {
+      await _repository.patchItemPrice(
+        itemId: itemId,
+        price: price,
+        currency: currency,
+        reason: reason,
+        authToken: authToken,
+      );
+      final order = await _repository.fetchPurchaseOrderDetail(
+        id: orderId,
+        authToken: authToken,
+      );
+      value = value.copyWith(
+        isUpdatingPrice: false,
+        activePriceItemId: null,
+        order: order,
+        actionMessage: 'Cijena stavke je uspjesno azurirana.',
+        clearActionError: true,
+      );
+      return true;
+    } on ApiException catch (error) {
+      value = value.copyWith(
+        isUpdatingPrice: false,
+        activePriceItemId: null,
+        actionErrorMessage: error.message,
+      );
+      return false;
+    } catch (_) {
+      value = value.copyWith(
+        isUpdatingPrice: false,
+        activePriceItemId: null,
+        actionErrorMessage: 'Promjena cijene nije uspjela. Pokusajte ponovno.',
       );
       return false;
     }

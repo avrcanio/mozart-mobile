@@ -143,6 +143,32 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
     }
   }
 
+  Future<void> _openPriceAudit(PurchaseOrder order, PurchaseOrderLine line) async {
+    final result = await showModalBottomSheet<_PriceAuditSubmission>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _PriceAuditSheet(
+        line: line,
+        currency: order.currency,
+      ),
+    );
+    if (result == null) {
+      return;
+    }
+
+    final changed = await _controller.adjustItemPrice(
+      orderId: order.id,
+      itemId: line.id,
+      price: result.price,
+      currency: order.currency,
+      reason: result.reason,
+      authToken: widget.session.token,
+    );
+    if (changed && widget.onOrderChanged != null) {
+      await widget.onOrderChanged!();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<PurchaseOrderDetailState>(
@@ -165,6 +191,7 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
               onSend: _send,
               onEdit: _openEdit,
               onReceive: _openReceipt,
+              onPriceAudit: _openPriceAudit,
             ),
           ),
         ],
@@ -180,6 +207,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
     required this.onSend,
     required this.onEdit,
     required this.onReceive,
+    required this.onPriceAudit,
   });
 
   final PurchaseOrderDetailState state;
@@ -187,6 +215,8 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
   final Future<void> Function() onSend;
   final Future<void> Function(PurchaseOrder order) onEdit;
   final Future<void> Function(PurchaseOrder order) onReceive;
+  final Future<void> Function(PurchaseOrder order, PurchaseOrderLine line)
+      onPriceAudit;
 
   @override
   Widget build(BuildContext context) {
@@ -422,9 +452,13 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _LineItemCard(
                         line: line,
+                        isUpdatingPrice:
+                            state.isUpdatingPrice &&
+                            state.activePriceItemId == line.id,
                         currency: order.currency,
                         numberFormat: numberFormat,
                         currencyFormat: currencyFormat,
+                        onPriceAudit: () => onPriceAudit(order, line),
                       ),
                     ),
                   ),
@@ -472,15 +506,19 @@ class _DetailRow extends StatelessWidget {
 class _LineItemCard extends StatelessWidget {
   const _LineItemCard({
     required this.line,
+    required this.isUpdatingPrice,
     required this.currency,
     required this.numberFormat,
     required this.currencyFormat,
+    required this.onPriceAudit,
   });
 
   final PurchaseOrderLine line;
+  final bool isUpdatingPrice;
   final String currency;
   final NumberFormat numberFormat;
   final NumberFormat currencyFormat;
+  final VoidCallback onPriceAudit;
 
   @override
   Widget build(BuildContext context) {
@@ -509,10 +547,172 @@ class _LineItemCard extends StatelessWidget {
           Text(
             'Cijena: ${_formatMoney(line.unitPrice, currency, currencyFormat)}',
           ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: isUpdatingPrice ? null : onPriceAudit,
+              icon: isUpdatingPrice
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.price_change_outlined),
+              label: Text(
+                isUpdatingPrice ? 'Azuriranje...' : 'Korigiraj cijenu',
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+class _PriceAuditSheet extends StatefulWidget {
+  const _PriceAuditSheet({
+    required this.line,
+    required this.currency,
+  });
+
+  final PurchaseOrderLine line;
+  final String currency;
+
+  @override
+  State<_PriceAuditSheet> createState() => _PriceAuditSheetState();
+}
+
+class _PriceAuditSheetState extends State<_PriceAuditSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _priceController;
+  final TextEditingController _reasonController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _priceController = TextEditingController(
+      text: widget.line.unitPrice.toStringAsFixed(2).replaceAll('.', ','),
+    );
+  }
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    final normalizedPrice = _normalizeDecimalString(_priceController.text);
+    Navigator.of(context).pop(
+      _PriceAuditSubmission(
+        price: normalizedPrice,
+        reason: _reasonController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final insets = MediaQuery.of(context).viewInsets.bottom;
+    final currentPrice = NumberFormat.currency(
+      locale: 'hr_HR',
+      symbol: '',
+      decimalDigits: 2,
+    ).format(widget.line.unitPrice).trim();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + insets),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Korekcija cijene',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${widget.line.articleName} | Trenutno ${widget.currency} $currentPrice',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const Key('po-price-audit-price'),
+                  controller: _priceController,
+                  decoration: InputDecoration(
+                    labelText: 'Nova cijena (${widget.currency})',
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  validator: (value) {
+                    final parsed = _parseLocalizedDecimal(value ?? '');
+                    if (parsed == null || parsed <= 0) {
+                      return 'Unesite ispravnu cijenu.';
+                    }
+                    if (parsed == widget.line.unitPrice) {
+                      return 'Unesite novu cijenu razlicitu od postojece.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  key: const Key('po-price-audit-reason'),
+                  controller: _reasonController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Razlog promjene',
+                    hintText: 'Navedite zasto mijenjate cijenu stavke.',
+                  ),
+                  validator: (value) {
+                    if ((value ?? '').trim().isEmpty) {
+                      return 'Unesite razlog promjene.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Odustani'),
+                    ),
+                    const Spacer(),
+                    FilledButton(
+                      key: const Key('po-price-audit-submit'),
+                      onPressed: _submit,
+                      child: const Text('Spremi korekciju'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PriceAuditSubmission {
+  const _PriceAuditSubmission({
+    required this.price,
+    required this.reason,
+  });
+
+  final String price;
+  final String reason;
 }
 
 class _DetailStateCard extends StatelessWidget {
@@ -588,4 +788,16 @@ String _formatQuantity(double value, NumberFormat formatter) {
     return formatter.format(value.toInt());
   }
   return formatter.format(value);
+}
+
+double? _parseLocalizedDecimal(String value) {
+  final normalized = _normalizeDecimalString(value);
+  if (normalized.isEmpty) {
+    return null;
+  }
+  return double.tryParse(normalized);
+}
+
+String _normalizeDecimalString(String value) {
+  return value.trim().replaceAll(',', '.');
 }
