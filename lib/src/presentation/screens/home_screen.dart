@@ -351,13 +351,13 @@ class _DashboardTab extends StatelessWidget {
             : 2;
     final tiles = [
       (
-        'Open POs',
+        'Purchase Orders',
         '${summary?.openPurchaseOrders ?? 0}',
         Icons.inventory_2,
         const Color(0xFFF3E2D4),
       ),
       (
-        'Approvals',
+        'Created POs',
         '${summary?.pendingApprovals ?? 0}',
         Icons.gpp_good,
         const Color(0xFFE2ECE0),
@@ -367,12 +367,6 @@ class _DashboardTab extends StatelessWidget {
         '${summary?.totalMessages ?? 0}',
         Icons.mail_outline,
         const Color(0xFFF6E8D8),
-      ),
-      (
-        'Warehouses',
-        '${summary?.activeWarehouses ?? 0}',
-        Icons.warehouse,
-        const Color(0xFFE7E0D6),
       ),
     ];
 

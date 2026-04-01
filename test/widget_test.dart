@@ -84,7 +84,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Mozart Operator'), findsAtLeastNWidgets(1));
-    expect(find.text('Open POs'), findsOneWidget);
+    expect(find.text('Purchase Orders'), findsWidgets);
     expect(find.text('1'), findsWidgets);
   });
 
@@ -156,7 +156,11 @@ void main() {
     expect(find.text('3'), findsOneWidget);
     expect(find.text('27'), findsOneWidget);
     expect(find.text('Messages'), findsOneWidget);
-    expect(find.text('Unread Mail'), findsNothing);
+    expect(find.text('Purchase Orders'), findsWidgets);
+    expect(find.text('Created POs'), findsOneWidget);
+    expect(find.text('Open POs'), findsNothing);
+    expect(find.text('Approvals'), findsNothing);
+    expect(find.text('Warehouses'), findsNothing);
   });
 
   testWidgets('renders mailbox list from mapped backend data', (tester) async {
@@ -333,7 +337,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders'));
+    await tester.tap(find.text('Purchase Orders').last);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('PO-2048'), findsWidgets);
@@ -373,7 +377,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders'));
+    await tester.tap(find.text('Purchase Orders').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
@@ -414,7 +418,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders'));
+    await tester.tap(find.text('Purchase Orders').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
@@ -499,7 +503,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders'));
+    await tester.tap(find.text('Purchase Orders').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Filteri'));
@@ -671,7 +675,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders'));
+    await tester.tap(find.text('Purchase Orders').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-SEND').first);
