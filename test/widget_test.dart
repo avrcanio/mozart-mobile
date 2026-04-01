@@ -346,6 +346,164 @@ void main() {
     expect(find.textContaining('Approved'), findsWidgets);
   });
 
+  testWidgets('renders purchase order detail summary and line items', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Ana',
+          'last_name': 'Admin',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 2048,
+            'reference': 'PO-2048',
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'confirmed',
+            'status_display': 'Potvrdena',
+            'payment_type_name': 'Karticno',
+            'ordered_at': '2026-04-02T11:30:00Z',
+            'total_gross': '18420.50',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/purchase-orders/2048/': _jsonResponse(<String, dynamic>{
+          'id': 2048,
+          'reference': 'PO-2048',
+          'supplier': 2,
+          'supplier_name': 'Blue Harbor Supply',
+          'status': 'confirmed',
+          'status_display': 'Potvrdena',
+          'payment_type': 6,
+          'payment_type_name': 'Karticno',
+          'ordered_at': '2026-04-02T11:30:00Z',
+          'currency': 'EUR',
+          'total_net': '15000.00',
+          'total_gross': '18420.50',
+          'total_deposit': '85.00',
+          'items': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 7,
+              'artikl': 77,
+              'artikl_name': 'Coffee beans',
+              'quantity': '10.0000',
+              'unit_of_measure': 1,
+              'unit_name': 'kg',
+              'price': '12.00',
+              'received_quantity': '4.0000',
+              'remaining_quantity': '6.0000',
+              'base_group': '',
+            },
+          ],
+        }),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('PO-2048').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detalji narudzbe'), findsOneWidget);
+    expect(find.text('Narudzba PO-2048'), findsOneWidget);
+    expect(find.text('Blue Harbor Supply'), findsWidgets);
+    expect(find.text('Ukupni iznosi'), findsOneWidget);
+    expect(find.textContaining('EUR 15.000,00'), findsOneWidget);
+    expect(find.textContaining('EUR 18.420,50'), findsOneWidget);
+    expect(find.textContaining('EUR 85,00'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.textContaining('Coffee beans'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.textContaining('Coffee beans'), findsOneWidget);
+    expect(find.textContaining('Kolicina: 10 kg'), findsOneWidget);
+    expect(find.textContaining('Preostalo: 6'), findsOneWidget);
+  });
+
+  testWidgets('shows purchase order detail retry state on fetch error', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 2048,
+            'reference': 'PO-2048',
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'confirmed',
+            'status_display': 'Potvrdena',
+            'payment_type_name': 'Karticno',
+            'ordered_at': '2026-04-02T11:30:00Z',
+            'total_gross': '18420.50',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/purchase-orders/2048/': _FakeResponse(
+          statusCode: 500,
+          body: jsonEncode(<String, dynamic>{'detail': 'Server error'}),
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('PO-2048').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detalji nisu dostupni'), findsOneWidget);
+    expect(find.text('Pokusaj ponovno'), findsOneWidget);
+  });
+
   testWidgets('shows user-facing error state when purchase orders fail', (
     tester,
   ) async {
@@ -683,6 +841,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
 
+    expect(find.text('Detalji narudzbe'), findsOneWidget);
     expect(find.text('Posalji narudzbu'), findsOneWidget);
 
     await tester.tap(find.text('Posalji narudzbu'));

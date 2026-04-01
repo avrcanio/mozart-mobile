@@ -11,6 +11,9 @@ class PurchaseOrderDto {
     required this.paymentTypeId,
     required this.paymentTypeName,
     required this.totalAmount,
+    required this.totalNetAmount,
+    required this.totalGrossAmount,
+    required this.totalDepositAmount,
     required this.currency,
     required this.orderedAt,
     required this.lines,
@@ -25,6 +28,9 @@ class PurchaseOrderDto {
   final int? paymentTypeId;
   final String paymentTypeName;
   final double totalAmount;
+  final double totalNetAmount;
+  final double totalGrossAmount;
+  final double totalDepositAmount;
   final String currency;
   final DateTime? orderedAt;
   final List<PurchaseOrderLineDto> lines;
@@ -81,6 +87,13 @@ class PurchaseOrderDto {
             json['total'] ??
             json['total_net'],
       ),
+      totalNetAmount: _asDouble(json['total_net'] ?? json['net_total']),
+      totalGrossAmount: _asDouble(
+        json['total_gross'] ?? json['gross_total'] ?? json['total_amount'],
+      ),
+      totalDepositAmount: _asDouble(
+        json['total_deposit'] ?? json['deposit_total'],
+      ),
       currency: (json['currency'] ?? 'EUR').toString(),
       orderedAt: _asDateTime(json['ordered_at'] ?? json['created_at']),
       lines: lines,
@@ -99,6 +112,9 @@ class PurchaseOrderDto {
       paymentTypeName:
           paymentTypeName.isEmpty ? 'Nije definirano' : paymentTypeName,
       totalAmount: totalAmount,
+      totalNetAmount: totalNetAmount,
+      totalGrossAmount: totalGrossAmount == 0 ? totalAmount : totalGrossAmount,
+      totalDepositAmount: totalDepositAmount,
       currency: currency,
       orderedAt: orderedAt,
       lines: lines.map((line) => line.toDomain()).toList(),

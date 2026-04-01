@@ -25,7 +25,7 @@ class PurchaseOrderDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Purchase Order Detail'),
+        title: const Text('Detalji narudzbe'),
       ),
       body: SafeArea(
         child: Padding(
@@ -168,6 +168,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
       decimalDigits: 2,
     );
     final dateFormat = DateFormat('dd.MM.yyyy.', 'hr_HR');
+    final numberFormat = NumberFormat.decimalPattern('hr_HR');
 
     if (state.isLoading && !state.hasContent) {
       return const _DetailStateCard(
@@ -282,12 +283,17 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('Narudzba ${order.reference}',
+                    style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 8),
                 Text(
-                  order.reference,
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  'Pregled osnovnih podataka i statusa narudzbe.',
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
-                const SizedBox(height: 12),
-                _DetailRow(label: 'Supplier', value: order.supplierName),
+                const SizedBox(height: 16),
+                _DetailRow(label: 'Sifra', value: '#${order.id}'),
+                _DetailRow(label: 'Referenca', value: order.reference),
+                _DetailRow(label: 'Dobavljac', value: order.supplierName),
                 _DetailRow(
                   label: 'Status',
                   value: order.statusLabel,
@@ -300,18 +306,52 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                   label: 'Datum',
                   value: _formatDate(order.orderedAt, dateFormat),
                 ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ukupni iznosi',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 14),
                 _DetailRow(
-                  label: 'Ukupno',
-                  value:
-                      '${order.currency} ${currencyFormat.format(order.totalAmount).trim()}',
+                  label: 'Neto',
+                  value: _formatMoney(order.totalNetAmount, order.currency, currencyFormat),
                 ),
                 _DetailRow(
+                  label: 'Bruto',
+                  value: _formatMoney(
+                    order.totalGrossAmount == 0
+                        ? order.totalAmount
+                        : order.totalGrossAmount,
+                    order.currency,
+                    currencyFormat,
+                  ),
+                ),
+                if (order.totalDepositAmount > 0)
+                  _DetailRow(
+                    label: 'Povratna',
+                    value: _formatMoney(
+                      order.totalDepositAmount,
+                      order.currency,
+                      currencyFormat,
+                    ),
+                  ),
+                _DetailRow(
                   label: 'Zaprimljeno',
-                  value: order.receivedQuantity.toString(),
+                  value: _formatQuantity(order.receivedQuantity, numberFormat),
                 ),
                 _DetailRow(
                   label: 'Preostalo',
-                  value: order.remainingQuantity.toString(),
+                  value: _formatQuantity(order.remainingQuantity, numberFormat),
                 ),
               ],
             ),
@@ -335,7 +375,12 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                   ...order.lines.map(
                     (line) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _LineItemCard(line: line),
+                      child: _LineItemCard(
+                        line: line,
+                        currency: order.currency,
+                        numberFormat: numberFormat,
+                        currencyFormat: currencyFormat,
+                      ),
                     ),
                   ),
               ],
@@ -380,9 +425,17 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _LineItemCard extends StatelessWidget {
-  const _LineItemCard({required this.line});
+  const _LineItemCard({
+    required this.line,
+    required this.currency,
+    required this.numberFormat,
+    required this.currencyFormat,
+  });
 
   final PurchaseOrderLine line;
+  final String currency;
+  final NumberFormat numberFormat;
+  final NumberFormat currencyFormat;
 
   @override
   Widget build(BuildContext context) {
@@ -403,10 +456,14 @@ class _LineItemCard extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
-          Text('Kolicina: ${line.quantity}'),
-          Text('Zaprimljeno: ${line.receivedQuantity}'),
-          Text('Preostalo: ${line.remainingQuantity}'),
-          Text('Cijena: ${line.unitPrice.toStringAsFixed(2)}'),
+          Text(
+            'Kolicina: ${_formatQuantity(line.quantity, numberFormat)} ${line.unitName}'.trim(),
+          ),
+          Text('Zaprimljeno: ${_formatQuantity(line.receivedQuantity, numberFormat)}'),
+          Text('Preostalo: ${_formatQuantity(line.remainingQuantity, numberFormat)}'),
+          Text(
+            'Cijena: ${_formatMoney(line.unitPrice, currency, currencyFormat)}',
+          ),
         ],
       ),
     );
@@ -475,4 +532,15 @@ String _formatDate(DateTime? value, DateFormat formatter) {
     return 'Bez datuma';
   }
   return formatter.format(value.toLocal());
+}
+
+String _formatMoney(double value, String currency, NumberFormat formatter) {
+  return '$currency ${formatter.format(value).trim()}';
+}
+
+String _formatQuantity(double value, NumberFormat formatter) {
+  if (value == value.roundToDouble()) {
+    return formatter.format(value.toInt());
+  }
+  return formatter.format(value);
 }

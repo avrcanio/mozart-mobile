@@ -9,6 +9,9 @@ class PurchaseOrder {
     required this.paymentTypeId,
     required this.paymentTypeName,
     required this.totalAmount,
+    this.totalNetAmount = 0,
+    this.totalGrossAmount = 0,
+    this.totalDepositAmount = 0,
     required this.currency,
     required this.orderedAt,
     required this.lines,
@@ -23,6 +26,9 @@ class PurchaseOrder {
   final int? paymentTypeId;
   final String paymentTypeName;
   final double totalAmount;
+  final double totalNetAmount;
+  final double totalGrossAmount;
+  final double totalDepositAmount;
   final String currency;
   final DateTime? orderedAt;
   final List<PurchaseOrderLine> lines;
