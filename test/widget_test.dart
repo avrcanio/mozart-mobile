@@ -89,7 +89,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Pocetna'), findsWidgets);
+    expect(find.text('Početna'), findsWidgets);
     expect(find.byKey(const Key('home-avatar-initials')), findsOneWidget);
     expect(find.text('MO'), findsOneWidget);
     expect(find.text('Narudžbe'), findsWidgets);
@@ -222,13 +222,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Poruke'), findsWidgets);
 
-    await tester.tap(_navigationDestinationFinder('Pocetna'));
+    await tester.tap(_navigationDestinationFinder('Početna'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Narudžbe').first);
     await tester.pumpAndSettle();
     expect(find.text('Narudžbe'), findsWidgets);
 
-    await tester.tap(_navigationDestinationFinder('Pocetna'));
+    await tester.tap(_navigationDestinationFinder('Početna'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Kreirane').first);
     await tester.pumpAndSettle();
@@ -1983,7 +1983,10 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.tap(find.text('Nova'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('po-form-supplier')));
+    await tester.enterText(
+      find.byKey(const Key('po-form-supplier')),
+      'Blue Harbor',
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Blue Harbor Supply').last);
     await tester.pumpAndSettle();
@@ -3324,6 +3327,122 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     },
   );
 
+  testWidgets('shows selected supplier name in edit purchase order form', (
+    tester,
+  ) async {
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+          ]),
+          'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 5, 'name': 'Virman'},
+          ]),
+          'GET /api/suppliers/2/artikli/': _jsonListResponse(
+            <Map<String, dynamic>>[],
+          ),
+        }),
+      ),
+    );
+
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+
+    const initialOrder = PurchaseOrder(
+      id: 44,
+      reference: 'PO-EDIT',
+      supplierId: 2,
+      status: 'created',
+      statusLabel: 'Kreirana',
+      supplierName: 'Blue Harbor Supply',
+      paymentTypeId: 5,
+      paymentTypeName: 'Virman',
+      totalAmount: 130,
+      currency: 'EUR',
+      orderedAt: null,
+      lines: <PurchaseOrderLine>[],
+    );
+
+    await tester.pumpWidget(
+      _testMaterialApp(
+        home: PurchaseOrderFormScreen(
+          session: session,
+          repository: repository,
+          initialOrder: initialOrder,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final supplierField = tester.widget<TextFormField>(
+      find.byKey(const Key('po-form-supplier')),
+    );
+    expect(supplierField.controller!.text, 'Blue Harbor Supply');
+  });
+
+  testWidgets('requires re-selecting supplier when autocomplete text is edited', (
+    tester,
+  ) async {
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            <String, dynamic>{'id': 3, 'name': 'Coffee Logistics'},
+          ]),
+          'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 5, 'name': 'Virman'},
+          ]),
+        }),
+      ),
+    );
+
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+
+    await tester.pumpWidget(
+      _testMaterialApp(
+        home: PurchaseOrderFormScreen(
+          session: session,
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-form-supplier')),
+      'Blue Harbor',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Blue Harbor Supply').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-form-supplier')),
+      'Blue Harbor x',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-form-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Odaberite dobavljača iz popisa.'), findsOneWidget);
+    expect(find.text('Dodaj stavku'), findsNothing);
+  });
+
   test('creates purchase order with expected payload mapping', () async {
     ApiRequest? capturedRequest;
     final repository = PurchaseOrderRepository(
@@ -3572,7 +3691,10 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('po-form-supplier')));
+    await tester.enterText(
+      find.byKey(const Key('po-form-supplier')),
+      'Blue Harbor',
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Blue Harbor Supply').last);
     await tester.pumpAndSettle();

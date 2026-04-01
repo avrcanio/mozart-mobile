@@ -83,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return 'Narud\u017Ebe';
       case 0:
       default:
-        return 'Pocetna';
+        return 'Početna';
     }
   }
 
@@ -272,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
             selectedIcon: Icon(Icons.dashboard),
-            label: 'Pocetna',
+            label: 'Početna',
           ),
           NavigationDestination(
             icon: Icon(Icons.mail_outline),

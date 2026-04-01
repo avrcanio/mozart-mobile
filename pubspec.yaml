@@ -114,5 +114,5 @@ flutter_native_splash:
   background_image: assets/branding/splash_screen.png
   android_12:
     color: "#F6F0E8"
-    image: assets/branding/app_mark.png
+    image: assets/branding/app_mark_android12.png
     icon_background_color: "#F6F0E8"

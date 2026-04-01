@@ -33,6 +33,8 @@ class PurchaseOrderFormScreen extends StatefulWidget {
 class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _dateController = TextEditingController();
+  final _supplierController = TextEditingController();
+  final _supplierFocusNode = FocusNode();
 
   bool _isLoading = true;
   bool _isSubmitting = false;
@@ -66,7 +68,18 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
   @override
   void dispose() {
     _dateController.dispose();
+    _supplierController.dispose();
+    _supplierFocusNode.dispose();
     super.dispose();
+  }
+
+  SupplierDto? get _selectedSupplier {
+    for (final supplier in _suppliers) {
+      if (supplier.id == _selectedSupplierId) {
+        return supplier;
+      }
+    }
+    return null;
   }
 
   Future<void> _loadLookups() async {
@@ -98,6 +111,8 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
         _suppliers = suppliers;
         _paymentTypes = paymentTypes;
         _articles = articles;
+        _supplierController.text =
+            _selectedSupplier?.name ?? widget.initialOrder?.supplierName ?? '';
         _isLoading = false;
       });
     } catch (_) {
@@ -140,6 +155,50 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
             'Artikli za odabranog dobavlja\u010Da trenutno nisu dostupni.';
       });
     }
+  }
+
+  Iterable<SupplierDto> _filterSuppliers(String query) {
+    final normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) {
+      return _suppliers;
+    }
+    return _suppliers.where(
+      (supplier) => supplier.name.toLowerCase().contains(normalizedQuery),
+    );
+  }
+
+  void _handleSupplierTextChanged(FormFieldState<int> field, String value) {
+    final selectedSupplier = _selectedSupplier;
+    if (selectedSupplier != null && selectedSupplier.name == value) {
+      field.didChange(selectedSupplier.id);
+      return;
+    }
+    if (_selectedSupplierId != null) {
+      setState(() {
+        _selectedSupplierId = null;
+      });
+    }
+    field.didChange(null);
+  }
+
+  Future<void> _handleSupplierSelected(
+    FormFieldState<int> field,
+    SupplierDto supplier,
+  ) async {
+    final previousSupplierId = _selectedSupplierId;
+    setState(() {
+      _selectedSupplierId = supplier.id;
+      _supplierController.value = TextEditingValue(
+        text: supplier.name,
+        selection: TextSelection.collapsed(offset: supplier.name.length),
+      );
+    });
+    field.didChange(supplier.id);
+    _supplierFocusNode.unfocus();
+    if (previousSupplierId == supplier.id) {
+      return;
+    }
+    await _loadArticlesForSupplier(supplier.id);
   }
 
   void _addLine() {
@@ -320,38 +379,90 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                             ),
                           ),
                         ),
-                      DropdownButtonFormField<int>(
-                        key: const Key('po-form-supplier'),
+                      FormField<int>(
                         initialValue: _selectedSupplierId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Dobavlja\u010D',
-                        ),
-                        items: _suppliers
-                            .map(
-                              (supplier) => DropdownMenuItem<int>(
-                                value: supplier.id,
-                                child: Text(
-                                  supplier.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                        validator: (_) {
+                          final supplierName = _supplierController.text.trim();
+                          final selectedSupplier = _selectedSupplier;
+                          if (supplierName.isEmpty) {
+                            return 'Odaberite dobavlja\u010Da.';
+                          }
+                          if (_selectedSupplierId == null) {
+                            return 'Odaberite dobavlja\u010Da iz popisa.';
+                          }
+                          if (selectedSupplier == null ||
+                              selectedSupplier.name != supplierName) {
+                            return 'Odaberite dobavlja\u010Da iz popisa.';
+                          }
+                          return null;
+                        },
+                        builder: (field) {
+                          return RawAutocomplete<SupplierDto>(
+                            textEditingController: _supplierController,
+                            focusNode: _supplierFocusNode,
+                            displayStringForOption: (supplier) => supplier.name,
+                            optionsBuilder: (textEditingValue) =>
+                                _filterSuppliers(textEditingValue.text),
+                            onSelected: (supplier) =>
+                                _handleSupplierSelected(field, supplier),
+                            optionsViewBuilder: (context, onSelected, options) {
+                              final optionsList = options.toList(growable: false);
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Material(
+                                  elevation: 4,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxHeight: 240,
+                                      minWidth: 280,
+                                    ),
+                                    child: ListView.builder(
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      shrinkWrap: true,
+                                      itemCount: optionsList.length,
+                                      itemBuilder: (context, index) {
+                                        final supplier = optionsList[index];
+                                        return ListTile(
+                                          key: Key('po-form-supplier-option-${supplier.id}'),
+                                          title: Text(
+                                            supplier.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          onTap: _isSubmitting
+                                              ? null
+                                              : () => onSelected(supplier),
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _isSubmitting
-                            ? null
-                            : (value) async {
-                                if (value == null) {
-                                  return;
-                                }
-                                setState(() {
-                                  _selectedSupplierId = value;
-                                });
-                                await _loadArticlesForSupplier(value);
-                              },
-                        validator: (value) =>
-                            value == null ? 'Odaberite dobavlja\u010Da.' : null,
+                              );
+                            },
+                            fieldViewBuilder: (
+                              context,
+                              controller,
+                              focusNode,
+                              onFieldSubmitted,
+                            ) {
+                              return TextFormField(
+                                key: const Key('po-form-supplier'),
+                                controller: controller,
+                                focusNode: focusNode,
+                                enabled: !_isSubmitting,
+                                decoration: InputDecoration(
+                                  labelText: 'Dobavlja\u010D',
+                                  errorText: field.errorText,
+                                  suffixIcon: const Icon(Icons.search),
+                                ),
+                                onChanged: (value) =>
+                                    _handleSupplierTextChanged(field, value),
+                                onFieldSubmitted: (_) => onFieldSubmitted(),
+                              );
+                            },
+                          );
+                        },
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<int>(
