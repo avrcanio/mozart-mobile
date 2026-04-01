@@ -75,6 +75,20 @@ class _HomeScreenState extends State<HomeScreen> {
     _purchaseOrdersController.load(token);
   }
 
+  void _refreshCurrentTab() {
+    switch (_index) {
+      case 0:
+        _dashboardController.load(widget.session.token);
+        return;
+      case 1:
+        _mailboxController.load(widget.session.token);
+        return;
+      case 2:
+        _purchaseOrdersController.load(widget.session.token);
+        return;
+    }
+  }
+
   Future<void> _showPurchaseOrderFilters(PurchaseOrdersState state) async {
     await _purchaseOrdersController.ensureSuppliersLoaded(widget.session.token);
     if (!mounted) {
@@ -212,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: _loadAll,
+            onPressed: _refreshCurrentTab,
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
           ),

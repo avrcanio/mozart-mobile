@@ -833,6 +833,254 @@ void main() {
     expect(find.text('Status: Poslana'), findsNothing);
   });
 
+  testWidgets('shows friendly empty state for filtered purchase orders', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'reference': 'PO-BASE',
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 1,
+              'reference': 'PO-BASE',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '99.99',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+        ]),
+        'GET /api/purchase-orders/?status=sent': _jsonPaginatedResponse(
+          count: 0,
+          results: <Map<String, dynamic>>[],
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Filteri'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-filter-status')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Poslana').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Primijeni'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nema aktivnih narudzbi'), findsOneWidget);
+    expect(find.text('Status: Poslana'), findsOneWidget);
+  });
+
+  testWidgets('keeps purchase order filters active after create flow refresh', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'reference': 'PO-BASE',
+            'supplier_name': 'Blue Harbor Supply',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 1,
+              'reference': 'PO-BASE',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '99.99',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+        ]),
+        'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{'id': 5, 'name': 'Virman'},
+        ]),
+        'GET /api/suppliers/2/artikli/': _jsonListResponse(
+          <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 77,
+              'artikl_name': 'Coffee beans',
+              'unit_of_measure': 1,
+              'unit_name': 'kg',
+              'price': '12.50',
+            },
+          ],
+        ),
+        'POST /api/purchase-orders/': _jsonResponse(<String, dynamic>{
+          'id': 91,
+          'reference': 'PO-NEW',
+          'supplier': 2,
+          'supplier_name': 'Blue Harbor Supply',
+          'status': 'created',
+          'status_display': 'Kreirana',
+          'payment_type': 5,
+          'payment_type_name': 'Virman',
+          'ordered_at': '2026-04-05T09:30:00Z',
+          'total_gross': '120.00',
+          'items': <Map<String, dynamic>>[],
+        }),
+        'GET /api/purchase-orders/?status=sent': <_FakeResponse>[
+          _jsonPaginatedResponse(
+            count: 1,
+            results: <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 2048,
+                'reference': 'PO-FILTERED',
+                'supplier_name': 'Blue Harbor Supply',
+                'status': 'sent',
+                'status_display': 'Poslana',
+                'payment_type_name': 'Karticno',
+                'ordered_at': '2026-04-02T11:30:00Z',
+                'total_gross': '18420.50',
+                'items': <Map<String, dynamic>>[],
+              },
+            ],
+          ),
+          _jsonPaginatedResponse(
+            count: 1,
+            results: <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 2048,
+                'reference': 'PO-FILTERED',
+                'supplier_name': 'Blue Harbor Supply',
+                'status': 'sent',
+                'status_display': 'Poslana',
+                'payment_type_name': 'Karticno',
+                'ordered_at': '2026-04-02T11:30:00Z',
+                'total_gross': '18420.50',
+                'items': <Map<String, dynamic>>[],
+              },
+            ],
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Filteri'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-filter-status')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Poslana').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Primijeni'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-FILTERED'), findsOneWidget);
+    expect(find.text('Status: Poslana'), findsOneWidget);
+
+    await tester.tap(find.text('Nova'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-form-supplier')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Blue Harbor Supply').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-form-payment-type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Virman').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Dodaj stavku'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('po-line-0-quantity')), '1');
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('po-form-save')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('po-form-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-FILTERED'), findsOneWidget);
+    expect(find.text('Status: Poslana'), findsOneWidget);
+    expect(find.textContaining('PO-BASE'), findsNothing);
+  });
+
   testWidgets('logout removes persisted token', (tester) async {
     final harness = await _createHarness(
       savedToken: 'saved-token',
