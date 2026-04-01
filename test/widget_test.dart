@@ -483,7 +483,7 @@ void main() {
     );
   });
 
-  testWidgets('uses html fallback messaging in mailbox detail when body text is missing', (
+  testWidgets('renders cleaned html mail content instead of raw Word markup', (
     tester,
   ) async {
     final harness = await _createHarness(
@@ -529,7 +529,29 @@ void main() {
           'to_emails': 'root@mozart.local',
           'sent_at': '2026-04-01T08:45:00Z',
           'body_text': '',
-          'body_html': '<p>HTML fallback content</p>',
+          'body_html': '''
+            <html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+              <head>
+                <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-2">
+                <style>
+                  @font-face {font-family:Aptos;}
+                  p.MsoNormal {margin:0cm;font-size:11.0pt;font-family:"Aptos",sans-serif;}
+                </style>
+              </head>
+              <body>
+                <div class="WordSection1">
+                  <p class="MsoNormal"><strong>RACUNI</strong></p>
+                  <p class="MsoNormal">Pregled posiljatelja, primatelja i sadrzaja poruke.</p>
+                  <p class="MsoNormal">
+                    <a href="https://example.test/poruka">Otvori poruku u pregledniku</a>
+                  </p>
+                  <p class="MsoNormal">
+                    <img src="https://example.test/logo.png" alt="Logo dobavljaca" />
+                  </p>
+                </div>
+              </body>
+            </html>
+          ''',
           'attachments': <Map<String, dynamic>>[],
         }),
       },
@@ -547,12 +569,93 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Detalji poruke'), findsOneWidget);
+    expect(find.text('RACUNI'), findsOneWidget);
     expect(
-      find.textContaining('tekstualni fallback'),
+      find.text('Pregled posiljatelja, primatelja i sadrzaja poruke.'),
+      findsWidgets,
+    );
+    expect(find.text('Otvori poruku u pregledniku'), findsOneWidget);
+    expect(find.textContaining('<html xmlns:v='), findsNothing);
+    expect(find.textContaining('@font-face'), findsNothing);
+    expect(find.byType(Image), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Prilozi (0)'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Prilozi (0)'), findsOneWidget);
+  });
+
+  testWidgets('falls back to body text when html content is not renderable', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 9,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mail',
+          'last_name': 'User',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 702,
+            'subject': 'Fallback poruka',
+            'from_email': 'nabava@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 88,
+            'reference': 'PO-88',
+            'supplier_name': 'Warehouse One',
+            'status': 'sent',
+            'status_display': 'Sent',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'total_gross': '99.99',
+            'items': <Map<String, dynamic>>[],
+          },
+        ]),
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/mailbox/messages/702/': _jsonResponse(<String, dynamic>{
+          'id': 702,
+          'subject': 'Fallback poruka',
+          'from_email': 'nabava@mozart.hr',
+          'to_emails': 'root@mozart.local',
+          'sent_at': '2026-04-01T08:45:00Z',
+          'body_text': 'Ovo je tekstualni fallback poruke.',
+          'body_html': '<html><head></head></html>',
+          'attachments': <Map<String, dynamic>>[],
+        }),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(_navigationDestinationFinder('Poruke'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Fallback poruka'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detalji poruke'), findsOneWidget);
+    expect(
+      find.textContaining('nije bila dovoljno cista za bogatiji prikaz'),
       findsOneWidget,
     );
-    expect(find.text('<p>HTML fallback content</p>'), findsOneWidget);
-    expect(find.text('Prilozi (0)'), findsOneWidget);
+    expect(find.text('Ovo je tekstualni fallback poruke.'), findsOneWidget);
+    expect(find.textContaining('<html><head>'), findsNothing);
   });
 
   testWidgets('shows mailbox detail retry state on fetch error', (tester) async {

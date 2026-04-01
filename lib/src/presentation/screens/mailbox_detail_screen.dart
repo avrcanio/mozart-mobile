@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -102,7 +103,7 @@ class _MailboxDetailPaneState extends State<MailboxDetailPane> {
               alignment: Alignment.centerRight,
               child: IconButton(
                 onPressed: _load,
-                tooltip: 'Refresh',
+                tooltip: 'Osvjezi',
                 icon: const Icon(Icons.refresh),
               ),
             ),
@@ -222,18 +223,14 @@ class _MailboxDetailBody extends StatelessWidget {
                   'Sadrzaj poruke',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                if (message.isUsingHtmlFallback) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Prikazujemo tekstualni fallback jer bogatiji HTML prikaz jos nije podrzan u aplikaciji.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.secondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 14),
-                SelectableText(message.bodyContent),
+                if (message.hasRenderableHtml)
+                  _MailHtmlContent(
+                    html: message.renderableHtmlContent,
+                    fallbackText: message.hasBodyText ? message.bodyText.trim() : null,
+                  )
+                else
+                  _MailBodyFallback(message: message),
               ],
             ),
           ),
@@ -267,6 +264,159 @@ class _MailboxDetailBody extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MailHtmlContent extends StatelessWidget {
+  const _MailHtmlContent({
+    required this.html,
+    this.fallbackText,
+  });
+
+  final String html;
+  final String? fallbackText;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Html(
+      data: html,
+      shrinkWrap: true,
+      onLinkTap: (url, attributes, element) async {
+        final uri = url == null ? null : Uri.tryParse(url);
+        if (uri == null) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Link u poruci nije valjan.')),
+            );
+          }
+          return;
+        }
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      },
+      style: {
+        'html': Style(
+          margin: Margins.zero,
+          padding: HtmlPaddings.zero,
+          fontSize: FontSize(theme.textTheme.bodyLarge?.fontSize ?? 16),
+          lineHeight: const LineHeight(1.5),
+          color: theme.colorScheme.onSurface,
+        ),
+        'body': Style(
+          margin: Margins.zero,
+          padding: HtmlPaddings.zero,
+        ),
+        'p': Style(margin: Margins.only(bottom: 14)),
+        'div': Style(margin: Margins.only(bottom: 10)),
+        'ul': Style(margin: Margins.only(bottom: 14, left: 18)),
+        'ol': Style(margin: Margins.only(bottom: 14, left: 18)),
+        'li': Style(margin: Margins.only(bottom: 6)),
+        'table': Style(
+          margin: Margins.only(bottom: 14),
+          backgroundColor: Colors.white.withValues(alpha: 0.72),
+        ),
+        'th': Style(
+          padding: HtmlPaddings.all(10),
+          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.08),
+          fontWeight: FontWeight.w700,
+        ),
+        'td': Style(
+          padding: HtmlPaddings.all(10),
+          border: Border.all(
+            color: theme.colorScheme.primary.withValues(alpha: 0.10),
+            width: 0.8,
+          ),
+        ),
+        'a': Style(
+          color: theme.colorScheme.primary,
+          textDecoration: TextDecoration.underline,
+        ),
+        'img': Style(
+          width: Width(100, Unit.percent),
+          margin: Margins.only(bottom: 12, top: 8),
+        ),
+      },
+      extensions: [
+        TagExtension(
+          tagsToExtend: const {'img'},
+          builder: (extensionContext) {
+            final attributes = extensionContext.attributes;
+            final source = attributes['src']?.trim() ?? '';
+            final altText = attributes['alt']?.trim() ?? 'Slika iz poruke';
+            if (source.isEmpty) {
+              return _InlineHtmlNotice(label: altText);
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.network(
+                  source,
+                  fit: BoxFit.contain,
+                  errorBuilder: (imageContext, error, stackTrace) =>
+                      _InlineHtmlNotice(label: altText),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _MailBodyFallback extends StatelessWidget {
+  const _MailBodyFallback({required this.message});
+
+  final MailMessageDetail message;
+
+  @override
+  Widget build(BuildContext context) {
+    if (message.isUsingHtmlFallback) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'HTML poruka nije bila dovoljno cista za bogatiji prikaz pa prikazujemo dostupni tekst.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.secondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SelectableText(message.bodyContent),
+        ],
+      );
+    }
+
+    return SelectableText(message.bodyContent);
+  }
+}
+
+class _InlineHtmlNotice extends StatelessWidget {
+  const _InlineHtmlNotice({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.10),
+        ),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
     );
   }
 }

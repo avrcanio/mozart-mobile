@@ -24,14 +24,16 @@ class MailMessageDetail {
   bool get hasRecipients => toEmails.isNotEmpty || ccEmails.isNotEmpty;
   bool get hasBodyText => bodyText.trim().isNotEmpty;
   bool get hasBodyHtml => bodyHtml.trim().isNotEmpty;
-  bool get isUsingHtmlFallback => !hasBodyText && hasBodyHtml;
+  String get renderableHtmlContent => _prepareRenderableHtml(bodyHtml);
+  bool get hasRenderableHtml => renderableHtmlContent.trim().isNotEmpty;
+  bool get isUsingHtmlFallback => !hasRenderableHtml && hasBodyText;
 
   String get bodyContent {
+    if (hasRenderableHtml) {
+      return '';
+    }
     if (hasBodyText) {
       return bodyText.trim();
-    }
-    if (hasBodyHtml) {
-      return bodyHtml.trim();
     }
     return 'Poruka nema dostupnog sadrzaja.';
   }
@@ -53,4 +55,63 @@ class MailAttachment {
   final String fileUrl;
 
   bool get hasLink => fileUrl.isNotEmpty;
+}
+
+String _prepareRenderableHtml(String html) {
+  final trimmed = html.trim();
+  if (trimmed.isEmpty) {
+    return '';
+  }
+
+  var normalized = trimmed
+      .replaceAll(RegExp(r'<!--\[if[\s\S]*?<!\[endif\]-->', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<\?xml[\s\S]*?\?>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<o:[^>]*>[\s\S]*?<\/o:[^>]*>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<w:[^>]*>[\s\S]*?<\/w:[^>]*>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<m:[^>]*>[\s\S]*?<\/m:[^>]*>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<v:[^>]*>[\s\S]*?<\/v:[^>]*>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<style[^>]*>[\s\S]*?<\/style>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<meta[^>]*>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<link[^>]*>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<title[^>]*>[\s\S]*?<\/title>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'<head[^>]*>[\s\S]*?<\/head>', caseSensitive: false), '')
+      .replaceAll(RegExp(r'@font-face\s*\{[\s\S]*?\}', caseSensitive: false), '')
+      .replaceAll(RegExp(r'mso-[a-z\-]+:[^;"]+;?', caseSensitive: false), '');
+
+  final bodyMatch = RegExp(
+    r'<body[^>]*>([\s\S]*?)<\/body>',
+    caseSensitive: false,
+  ).firstMatch(normalized);
+  if (bodyMatch != null) {
+    normalized = bodyMatch.group(1)?.trim() ?? normalized;
+  }
+
+  normalized = normalized
+      .replaceAll(
+        RegExp(r'\s+xmlns(:\w+)?="[^"]*"', caseSensitive: false),
+        '',
+      )
+      .replaceAll(
+        RegExp(r'\s+lang="[^"]*"', caseSensitive: false),
+        '',
+      )
+      .replaceAll(
+        RegExp(r'\s+class="[^"]*"', caseSensitive: false),
+        '',
+      )
+      .replaceAll(
+        RegExp(r'\s+style="[^"]*"', caseSensitive: false),
+        '',
+      )
+      .trim();
+
+  final hasMeaningfulHtml = RegExp(
+    r'<(p|div|span|table|tr|td|ul|ol|li|img|a|br|strong|b|em|i|h[1-6])\b',
+    caseSensitive: false,
+  ).hasMatch(normalized);
+  if (hasMeaningfulHtml) {
+    return normalized;
+  }
+
+  return '';
 }
