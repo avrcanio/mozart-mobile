@@ -221,7 +221,7 @@ class PurchaseOrderDto {
       entries.add(
         PurchaseOrderHistoryEntry(
           title: 'Primka kreirana',
-          description: 'Za ovu narudzbu je kreirana primka robe.',
+          description: 'Za ovu narudžbu je kreirana primka robe.',
           occurredAt: updatedAt,
         ),
       );

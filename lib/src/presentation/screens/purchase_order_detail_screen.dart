@@ -233,7 +233,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
       return const _DetailStateCard(
         icon: Icons.receipt_long_outlined,
         title: 'Ucitavanje detalja',
-        message: 'Pripremamo podatke o odabranoj narudzbi.',
+        message: 'Pripremamo podatke o odabranoj narudžbi.',
       );
     }
 
@@ -251,7 +251,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
       return _DetailStateCard(
         icon: Icons.receipt_outlined,
         title: 'Nema detalja za prikaz',
-        message: 'Podaci o narudzbi trenutno nisu dostupni.',
+        message: 'Podaci o narudžbi trenutno nisu dostupni.',
         actionLabel: 'Osvjezi',
         onAction: onRetry,
       );
@@ -410,7 +410,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                 const SizedBox(height: 14),
                 if (order.history.length <= 1)
                   const Text(
-                    'Dodatna povijest ce se prikazati cim backend posalje vise audit podataka za ovu narudzbu.',
+                    'Dodatna povijest će se prikazati čim backend pošalje više audit podataka za ovu narudžbu.',
                   )
                 else
                   ...order.history.map(
