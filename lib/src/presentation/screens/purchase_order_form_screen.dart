@@ -82,6 +82,32 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     return null;
   }
 
+  List<PaymentTypeDto> get _visiblePaymentTypes {
+    final filtered = _paymentTypes
+        .where((paymentType) => !_isRepresentationPaymentType(paymentType.name))
+        .toList(growable: true);
+    final selectedPaymentTypeId = _selectedPaymentTypeId;
+    if (selectedPaymentTypeId == null) {
+      return filtered;
+    }
+
+    final alreadyVisible = filtered.any(
+      (paymentType) => paymentType.id == selectedPaymentTypeId,
+    );
+    if (alreadyVisible) {
+      return filtered;
+    }
+
+    for (final paymentType in _paymentTypes) {
+      if (paymentType.id == selectedPaymentTypeId) {
+        filtered.add(paymentType);
+        break;
+      }
+    }
+
+    return filtered;
+  }
+
   Future<void> _loadLookups() async {
     setState(() {
       _isLoading = true;
@@ -472,7 +498,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Tip pla\u0107anja',
                         ),
-                        items: _paymentTypes
+                        items: _visiblePaymentTypes
                             .map(
                               (paymentType) => DropdownMenuItem<int>(
                                 value: paymentType.id,
@@ -865,6 +891,18 @@ class _PurchaseOrderDraftSnapshot {
         orderedAt,
         Object.hashAll(lines),
       );
+}
+
+bool _isRepresentationPaymentType(String value) {
+  final normalized = value
+      .trim()
+      .toLowerCase()
+      .replaceAll('č', 'c')
+      .replaceAll('ć', 'c')
+      .replaceAll('ž', 'z')
+      .replaceAll('š', 's')
+      .replaceAll('đ', 'd');
+  return normalized.contains('reprezent');
 }
 
 class _EditableOrderLineSnapshot {

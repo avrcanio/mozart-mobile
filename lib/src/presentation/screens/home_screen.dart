@@ -714,7 +714,6 @@ class _PurchaseOrdersTab extends StatelessWidget {
       symbol: '',
       decimalDigits: 2,
     );
-    final dateFormat = DateFormat('dd.MM.yyyy.', 'hr_HR');
     final selectedOrder = selectedOrderDetail;
     final sections = _buildPurchaseOrderSections(state.orders);
 
@@ -809,12 +808,9 @@ class _PurchaseOrdersTab extends StatelessWidget {
                       title: Text('${order.reference} | ${order.supplierName}'),
                       subtitle: Padding(
                         padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          _buildOrderListSubtitle(
-                            order,
-                            currencyFormat: currencyFormat,
-                            dateFormat: dateFormat,
-                          ),
+                        child: _OrderCardMetadata(
+                          order: order,
+                          currencyFormat: currencyFormat,
                         ),
                       ),
                       selected: selectedOrderId == order.id,
@@ -1294,29 +1290,263 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-String _buildOrderListSubtitle(
-  PurchaseOrder order, {
-  required NumberFormat currencyFormat,
-  required DateFormat dateFormat,
-}) {
-  final parts = <String>[
-    order.statusLabel,
-    order.paymentTypeName,
-    '${order.currency} ${currencyFormat.format(order.totalAmount).trim()}',
-  ];
+class _OrderCardMetadata extends StatelessWidget {
+  const _OrderCardMetadata({
+    required this.order,
+    required this.currencyFormat,
+  });
 
-  if (order.orderedAt != null) {
-    parts.add(_formatDate(order.orderedAt, dateFormat));
+  final PurchaseOrder order;
+  final NumberFormat currencyFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _StatusBadge(order: order),
+        _PaymentBadge(order: order),
+        Text(
+          '${currencyFormat.format(order.totalAmount).trim()} €',
+          key: Key('po-amount-${order.id}'),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
   }
-
-  return parts.join(' | ');
 }
 
-String _formatDate(DateTime? value, DateFormat formatter) {
-  if (value == null) {
-    return 'Bez datuma';
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.order});
+
+  final PurchaseOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    final config = _statusBadgeFor(order);
+
+    return Tooltip(
+      message: config.tooltip,
+      child: Container(
+        key: Key('po-status-badge-${order.id}'),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: config.backgroundColor,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.done, size: 16, color: config.firstColor),
+            const SizedBox(width: 2),
+            Icon(Icons.done, size: 16, color: config.secondColor),
+          ],
+        ),
+      ),
+    );
   }
-  return formatter.format(value.toLocal());
+}
+
+class _PaymentBadge extends StatelessWidget {
+  const _PaymentBadge({required this.order});
+
+  final PurchaseOrder order;
+
+  @override
+  Widget build(BuildContext context) {
+    final config = _paymentBadgeFor(order.paymentTypeName);
+
+    return Tooltip(
+      message: config.tooltip,
+      child: Container(
+        key: Key('po-payment-badge-${order.id}'),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: config.backgroundColor,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Icon(config.icon, size: 18, color: config.iconColor),
+      ),
+    );
+  }
+}
+
+class _StatusBadgeConfig {
+  const _StatusBadgeConfig({
+    required this.firstColor,
+    required this.secondColor,
+    required this.backgroundColor,
+    required this.tooltip,
+  });
+
+  final Color firstColor;
+  final Color secondColor;
+  final Color backgroundColor;
+  final String tooltip;
+}
+
+class _PaymentBadgeConfig {
+  const _PaymentBadgeConfig({
+    required this.icon,
+    required this.iconColor,
+    required this.backgroundColor,
+    required this.tooltip,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color backgroundColor;
+  final String tooltip;
+}
+
+_StatusBadgeConfig _statusBadgeFor(PurchaseOrder order) {
+  const blue = Color(0xFF2F6FED);
+  const yellow = Color(0xFFE0A400);
+  const green = Color(0xFF2E9D57);
+  const neutral = Color(0xFF7A6F66);
+  const blueBg = Color(0xFFE7EFFE);
+  const yellowBg = Color(0xFFFFF1CC);
+  const greenBg = Color(0xFFDCF4E4);
+  const mixedBg = Color(0xFFEAF0E4);
+  const neutralBg = Color(0xFFECE7E3);
+
+  switch (_normalizedOrderStatus(order)) {
+    case 'created':
+      return const _StatusBadgeConfig(
+        firstColor: blue,
+        secondColor: blue,
+        backgroundColor: blueBg,
+        tooltip: 'Kreirana',
+      );
+    case 'sent':
+      return const _StatusBadgeConfig(
+        firstColor: blue,
+        secondColor: yellow,
+        backgroundColor: mixedBg,
+        tooltip: 'Poslana',
+      );
+    case 'confirmed':
+      return const _StatusBadgeConfig(
+        firstColor: yellow,
+        secondColor: yellow,
+        backgroundColor: yellowBg,
+        tooltip: 'Potvrđena',
+      );
+    case 'received':
+      return const _StatusBadgeConfig(
+        firstColor: green,
+        secondColor: blue,
+        backgroundColor: mixedBg,
+        tooltip: 'Djelomično zaprimljena',
+      );
+    case 'received_all':
+      return const _StatusBadgeConfig(
+        firstColor: green,
+        secondColor: green,
+        backgroundColor: greenBg,
+        tooltip: 'Sve zaprimljeno',
+      );
+    default:
+      return _StatusBadgeConfig(
+        firstColor: neutral,
+        secondColor: neutral,
+        backgroundColor: neutralBg,
+        tooltip: order.statusLabel,
+      );
+  }
+}
+
+_PaymentBadgeConfig _paymentBadgeFor(String paymentTypeName) {
+  const cashColor = Color(0xFF1E8E5A);
+  const transferColor = Color(0xFF2563EB);
+  const cardColor = Color(0xFF7C4D2F);
+  const neutralColor = Color(0xFF7A6F66);
+  const cashBg = Color(0xFFDDF3E6);
+  const transferBg = Color(0xFFE5EEFF);
+  const cardBg = Color(0xFFF3E4DA);
+  const neutralBg = Color(0xFFECE7E3);
+  final normalized = _normalizeText(paymentTypeName);
+
+  if (normalized == 'gotovina') {
+    return const _PaymentBadgeConfig(
+      icon: Icons.payments_outlined,
+      iconColor: cashColor,
+      backgroundColor: cashBg,
+      tooltip: 'Gotovina',
+    );
+  }
+
+  if (normalized == 'virman') {
+    return const _PaymentBadgeConfig(
+      icon: Icons.receipt_long_outlined,
+      iconColor: transferColor,
+      backgroundColor: transferBg,
+      tooltip: 'Virman',
+    );
+  }
+
+  if (normalized.isNotEmpty) {
+    return _PaymentBadgeConfig(
+      icon: Icons.credit_card_outlined,
+      iconColor: cardColor,
+      backgroundColor: cardBg,
+      tooltip: paymentTypeName,
+    );
+  }
+
+  return const _PaymentBadgeConfig(
+    icon: Icons.credit_card_outlined,
+    iconColor: neutralColor,
+    backgroundColor: neutralBg,
+    tooltip: 'Način plaćanja nije definiran',
+  );
+}
+
+String _normalizedOrderStatus(PurchaseOrder order) {
+  final status = _normalizeText(order.status);
+  switch (status) {
+    case 'potvrdena':
+    case 'approved':
+      return 'confirmed';
+    default:
+      if (status.isNotEmpty) {
+        return status;
+      }
+  }
+
+  switch (_normalizeText(order.statusLabel)) {
+    case 'kreirana':
+      return 'created';
+    case 'poslana':
+      return 'sent';
+    case 'potvrdena':
+    case 'approved':
+      return 'confirmed';
+    case 'djelomicno zaprimljena':
+      return 'received';
+    case 'sve zaprimljeno':
+    case 'sve stavke s narudzbe su zaprimljene':
+      return 'received_all';
+    default:
+      return '';
+  }
+}
+
+String _normalizeText(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll('č', 'c')
+      .replaceAll('ć', 'c')
+      .replaceAll('ž', 'z')
+      .replaceAll('š', 's')
+      .replaceAll('đ', 'd');
 }
 
 class _MailboxSection {

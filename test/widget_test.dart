@@ -1235,8 +1235,8 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'id': 2048,
             'reference': 'PO-2048',
             'supplier_name': 'Blue Harbor Supply',
-            'status': 'approved',
-            'status_display': 'Approved',
+            'status': 'confirmed',
+            'status_display': 'Potvrđena',
             'payment_type_name': 'Karticno',
             'ordered_at': '2026-04-02T11:30:00Z',
             'total_gross': '18420.50',
@@ -1255,9 +1255,9 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'id': 2049,
             'reference': 'PO-2049',
             'supplier_name': 'Alpha Market',
-            'status': 'approved',
-            'status_display': 'Approved',
-            'payment_type_name': 'Karticno',
+            'status': 'created',
+            'status_display': 'Kreirana',
+            'payment_type_name': 'Gotovina',
             'ordered_at': '2026-04-02T08:30:00Z',
             'total_gross': '150.00',
             'items': <Map<String, dynamic>>[],
@@ -1266,8 +1266,8 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'id': 2050,
             'reference': 'PO-2050',
             'supplier_name': 'Fructus d.o.o.',
-            'status': 'approved',
-            'status_display': 'Approved',
+            'status': 'received',
+            'status_display': 'Djelomično zaprimljena',
             'payment_type_name': 'Virman',
             'ordered_at': '2026-04-01T11:30:00Z',
             'total_gross': '95.10',
@@ -1296,8 +1296,62 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     );
     expect(find.textContaining('PO-2048'), findsWidgets);
     expect(find.textContaining('Blue Harbor Supply'), findsWidgets);
-    expect(find.textContaining('18.420,50'), findsWidgets);
-    expect(find.textContaining('Approved'), findsWidgets);
+    expect(find.text('18.420,50 €'), findsOneWidget);
+    expect(find.text('150,00 €'), findsOneWidget);
+    expect(find.text('95,10 €'), findsOneWidget);
+    expect(find.textContaining('02.04.2026. 11:30'), findsNothing);
+    expect(find.textContaining('Approved'), findsNothing);
+    expect(find.byKey(const Key('po-status-badge-2048')), findsOneWidget);
+    expect(find.byKey(const Key('po-status-badge-2049')), findsOneWidget);
+    expect(find.byKey(const Key('po-status-badge-2050')), findsOneWidget);
+    expect(find.byKey(const Key('po-payment-badge-2048')), findsOneWidget);
+    expect(find.byKey(const Key('po-payment-badge-2049')), findsOneWidget);
+    expect(find.byKey(const Key('po-payment-badge-2050')), findsOneWidget);
+  });
+
+  testWidgets('filters out representation payment type in purchase order form', (
+    tester,
+  ) async {
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(
+          <String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 1, 'name': 'Fructus d.o.o.'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 4, 'name': 'Reprezentacija'},
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+              <String, dynamic>{'id': 6, 'name': 'Gotovina'},
+            ]),
+          },
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      _testMaterialApp(
+        home: PurchaseOrderFormScreen(
+          session: const UserSession(
+            token: 'token',
+            username: 'root',
+            fullName: 'Root User',
+            email: 'root@mozart.local',
+          ),
+          repository: repository,
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-form-payment-type')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Virman').last, findsOneWidget);
+    expect(find.text('Gotovina').last, findsOneWidget);
+    expect(find.text('Reprezentacija'), findsNothing);
   });
 
   testWidgets('renders purchase order detail summary and line items', (
