@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +16,7 @@ import 'package:mozart_mobile/src/domain/purchase_order.dart';
 import 'package:mozart_mobile/src/domain/user_session.dart';
 import 'package:mozart_mobile/src/presentation/app_services_scope.dart';
 import 'package:mozart_mobile/src/presentation/app_view.dart';
+import 'package:mozart_mobile/src/presentation/connectivity_feedback.dart';
 import 'package:mozart_mobile/src/presentation/screens/mailbox_detail_screen.dart';
 import 'package:mozart_mobile/src/presentation/session_scope.dart';
 import 'package:mozart_mobile/src/presentation/screens/purchase_order_form_screen.dart';
@@ -904,7 +906,73 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
+    expect(find.text(connectivityIssueMessage), findsOneWidget);
     expect(find.text('Pokusaj ponovno'), findsOneWidget);
+  });
+
+  testWidgets('recovers purchase orders after retry when connectivity returns', (
+    tester,
+  ) async {
+    var purchaseOrdersCallCount = 0;
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': (ApiRequest request) async {
+          purchaseOrdersCallCount += 1;
+          if (purchaseOrdersCallCount <= 2) {
+            throw SocketException('No route to host');
+          }
+          return _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 2050,
+              'reference': 'PO-2050',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-02T11:30:00Z',
+              'total_gross': '120.00',
+              'items': <Map<String, dynamic>>[],
+            },
+          ]);
+        },
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
+    expect(find.text(connectivityIssueMessage), findsOneWidget);
+
+    await tester.tap(find.text('Pokusaj ponovno'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-2050'), findsWidgets);
+    expect(find.text(connectivityIssueMessage), findsNothing);
   });
 
   testWidgets('returns to login and clears token when restored session is invalid', (
@@ -2188,8 +2256,32 @@ void main() {
         isA<ApiException>().having(
           (error) => error.message,
           'message',
-          'Zahtjev je istekao. Provjerite vezu i pokusajte ponovno.',
+          slowConnectionMessage,
         ),
+      ),
+    );
+  });
+
+  test('maps socket failures to connectivity api exception', () async {
+    final client = ApiClient(
+      baseUrl: 'https://example.test',
+      transport: _SocketFailureTransport(),
+    );
+
+    await expectLater(
+      () => client.getJson('/api/purchase-orders/', authToken: 'saved-token'),
+      throwsA(
+        isA<ApiException>()
+            .having(
+              (error) => error.message,
+              'message',
+              connectivityIssueMessage,
+            )
+            .having(
+              (error) => error.isConnectivityIssue,
+              'isConnectivityIssue',
+              true,
+            ),
       ),
     );
   });
@@ -2451,5 +2543,12 @@ class _NeverCompletesTransport implements ApiTransport {
   Future<ApiResponse> send(ApiRequest request) {
     final completer = Completer<ApiResponse>();
     return completer.future;
+  }
+}
+
+class _SocketFailureTransport implements ApiTransport {
+  @override
+  Future<ApiResponse> send(ApiRequest request) {
+    throw SocketException('Network is unreachable');
   }
 }

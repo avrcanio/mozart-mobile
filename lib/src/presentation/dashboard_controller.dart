@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/dashboard/dashboard_repository.dart';
 import '../domain/dashboard_summary.dart';
+import 'connectivity_feedback.dart';
 
 class DashboardState {
   const DashboardState({
@@ -54,8 +55,9 @@ class DashboardController extends ValueNotifier<DashboardState> {
     } catch (error) {
       value = value.copyWith(
         isLoading: false,
-        errorMessage:
-            'Dashboard trenutno nije dostupan. Pokusajte osvjeziti podatke.',
+        errorMessage: isConnectivityIssue(error)
+            ? connectivityIssueMessage
+            : 'Dashboard trenutno nije dostupan. Pokusajte osvjeziti podatke.',
       );
     }
   }

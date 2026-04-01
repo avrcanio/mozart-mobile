@@ -140,10 +140,29 @@ class ApiClient {
     late final ApiResponse response;
     try {
       response = await _transport.send(request).timeout(requestTimeout);
+    } on SocketException {
+      throw ApiException(
+        'Veza s Mozart servisom trenutno nije dostupna. Pokusajte ponovno za nekoliko trenutaka.',
+        uri: request.uri,
+        isConnectivityIssue: true,
+      );
+    } on HandshakeException {
+      throw ApiException(
+        'Veza s Mozart servisom trenutno nije dostupna. Pokusajte ponovno za nekoliko trenutaka.',
+        uri: request.uri,
+        isConnectivityIssue: true,
+      );
+    } on HttpException {
+      throw ApiException(
+        'Veza s Mozart servisom trenutno nije dostupna. Pokusajte ponovno za nekoliko trenutaka.',
+        uri: request.uri,
+        isConnectivityIssue: true,
+      );
     } on TimeoutException {
       throw ApiException(
-        'Zahtjev je istekao. Provjerite vezu i pokusajte ponovno.',
+        'Veza s Mozart servisom je prespora ili privremeno nedostupna. Pokusajte ponovno za nekoliko trenutaka.',
         uri: request.uri,
+        isConnectivityIssue: true,
       );
     }
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -276,11 +295,13 @@ class ApiException implements Exception {
     this.message, {
     this.statusCode,
     this.uri,
+    this.isConnectivityIssue = false,
   });
 
   final String message;
   final int? statusCode;
   final Uri? uri;
+  final bool isConnectivityIssue;
 
   @override
   String toString() => 'ApiException(statusCode: $statusCode, message: $message)';

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/mailbox/mailbox_repository.dart';
 import '../domain/mail_message.dart';
+import 'connectivity_feedback.dart';
 
 class MailboxState {
   const MailboxState({
@@ -54,8 +55,9 @@ class MailboxController extends ValueNotifier<MailboxState> {
     } catch (error) {
       value = value.copyWith(
         isLoading: false,
-        errorMessage:
-            'Poruke trenutno nisu dostupne. Pokusajte ponovno za nekoliko trenutaka.',
+        errorMessage: isConnectivityIssue(error)
+            ? connectivityIssueMessage
+            : 'Poruke trenutno nisu dostupne. Pokusajte ponovno za nekoliko trenutaka.',
       );
     }
   }

@@ -4,6 +4,7 @@ import '../data/purchase_orders/purchase_order_repository.dart';
 import '../domain/purchase_order.dart';
 import '../domain/purchase_order_filters.dart';
 import '../data/purchase_orders/models/supplier_dto.dart';
+import 'connectivity_feedback.dart';
 
 class PurchaseOrdersState {
   const PurchaseOrdersState({
@@ -80,8 +81,9 @@ class PurchaseOrdersController extends ValueNotifier<PurchaseOrdersState> {
     } catch (error) {
       value = value.copyWith(
         isLoading: false,
-        errorMessage:
-            'Narudzbe trenutno nisu dostupne. Osvjezite prikaz i pokusajte ponovno.',
+        errorMessage: isConnectivityIssue(error)
+            ? connectivityIssueMessage
+            : 'Narudzbe trenutno nisu dostupne. Osvjezite prikaz i pokusajte ponovno.',
       );
     }
   }

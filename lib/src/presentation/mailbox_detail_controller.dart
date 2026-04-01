@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/mailbox/mailbox_repository.dart';
 import '../domain/mail_message_detail.dart';
+import 'connectivity_feedback.dart';
 
 class MailboxDetailState {
   const MailboxDetailState({
@@ -57,11 +58,12 @@ class MailboxDetailController extends ValueNotifier<MailboxDetailState> {
         message: message,
         clearError: true,
       );
-    } catch (_) {
+    } catch (error) {
       value = value.copyWith(
         isLoading: false,
-        errorMessage:
-            'Detalji poruke trenutno nisu dostupni. Pokusajte ponovno.',
+        errorMessage: isConnectivityIssue(error)
+            ? connectivityIssueMessage
+            : 'Detalji poruke trenutno nisu dostupni. Pokusajte ponovno.',
       );
     }
   }
