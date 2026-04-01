@@ -88,12 +88,14 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Mozart Operator'), findsAtLeastNWidgets(1));
+    expect(find.text('Pocetna'), findsWidgets);
+    expect(find.byKey(const Key('home-avatar-initials')), findsOneWidget);
+    expect(find.text('MO'), findsOneWidget);
     expect(find.text('Narudzbe'), findsWidgets);
     expect(find.text('1'), findsWidgets);
   });
 
-  testWidgets('shows signed-in user identity only once in app header', (
+  testWidgets('shows active screen title and avatar menu in app header', (
     tester,
   ) async {
     final harness = await _createHarness(
@@ -139,9 +141,212 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Mozart Mobile'), findsOneWidget);
-    expect(find.text('Mozart Operator'), findsOneWidget);
-    expect(find.text('root'), findsOneWidget);
+    expect(find.text('Mozart Mobile'), findsNothing);
+    expect(find.text('Pregled najvaznijih obaveza i stanja za danasnji rad.'), findsNothing);
+    expect(find.text('Brzi pregled'), findsNothing);
+    expect(find.byKey(const Key('home-avatar-menu')), findsOneWidget);
+    expect(find.byKey(const Key('home-avatar-initials')), findsOneWidget);
+    expect(find.text('root'), findsNothing);
+    expect(find.text('Mozart Operator'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('home-avatar-menu')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Odjava'), findsOneWidget);
+  });
+
+  testWidgets('dashboard metric cards navigate to matching tabs', (tester) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 7,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mozart',
+          'last_name': 'Operator',
+        }),
+        'GET /api/mailbox/messages/': _jsonPaginatedResponse(
+          count: 3,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 101,
+              'subject': 'Daily digest',
+              'from_email': 'office@mozart.local',
+              'to_emails': 'root@mozart.local',
+              'sent_at': '2026-04-01T10:15:00Z',
+              'attachments_count': 0,
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/': _jsonPaginatedResponse(
+          count: 14,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 15,
+              'reference': 'PO-15',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'sent',
+              'status_display': 'Poslana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/?status=created': _jsonPaginatedResponse(
+          count: 2,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 19,
+              'reference': 'PO-19',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Poruke').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Poruke'), findsWidgets);
+
+    await tester.tap(_navigationDestinationFinder('Pocetna'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Narudzbe').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Narudzbe'), findsWidgets);
+
+    await tester.tap(_navigationDestinationFinder('Pocetna'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kreirane').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Narudzbe'), findsWidgets);
+  });
+
+  testWidgets('pull to refresh reloads each home tab independently', (
+    tester,
+  ) async {
+    var dashboardCreatedCount = 1;
+    var mailboxLoadCount = 0;
+    var purchaseOrderLoadCount = 0;
+
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 7,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mozart',
+          'last_name': 'Operator',
+        }),
+        'GET /api/mailbox/messages/': (ApiRequest request) {
+          mailboxLoadCount += 1;
+          return _jsonPaginatedResponse(
+            count: 3,
+            results: <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 100 + mailboxLoadCount,
+                'subject': 'Mail batch $mailboxLoadCount',
+                'from_email': 'office@mozart.local',
+                'to_emails': 'root@mozart.local',
+                'sent_at': '2026-04-01T10:15:00Z',
+                'attachments_count': 0,
+              },
+            ],
+          );
+        },
+        'GET /api/purchase-orders/': (ApiRequest request) {
+          purchaseOrderLoadCount += 1;
+          return _jsonPaginatedResponse(
+            count: 5,
+            results: <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 15,
+                'reference': 'PO-$purchaseOrderLoadCount',
+                'supplier_name': 'Adriatic Trade',
+                'status': 'sent',
+                'status_display': 'Poslana',
+                'payment_type_name': 'Virman',
+                'ordered_at': '2026-04-01T09:30:00Z',
+                'total_gross': '145.50',
+                'items': <Map<String, dynamic>>[],
+              },
+            ],
+          );
+        },
+        'GET /api/purchase-orders/?status=created': (ApiRequest request) {
+          dashboardCreatedCount += 1;
+          return _jsonPaginatedResponse(
+            count: dashboardCreatedCount,
+            results: <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 19,
+                'reference': 'PO-CREATED',
+                'supplier_name': 'Adriatic Trade',
+                'status': 'created',
+                'status_display': 'Kreirana',
+                'payment_type_name': 'Virman',
+                'ordered_at': '2026-04-01T09:30:00Z',
+                'total_gross': '145.50',
+                'items': <Map<String, dynamic>>[],
+              },
+            ],
+          );
+        },
+      },
+    );
+
+    String visibleTextStartingWith(String prefix) {
+      for (final widget in tester.widgetList<Text>(find.byType(Text))) {
+        final data = widget.data;
+        if (data != null && data.startsWith(prefix)) {
+          return data;
+        }
+      }
+      throw StateError('No visible text starting with $prefix');
+    }
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    expect(find.text('2'), findsWidgets);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 300));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.text('3'), findsWidgets);
+
+    await tester.tap(_navigationDestinationFinder('Poruke'));
+    await tester.pumpAndSettle();
+    final initialMailboxSubject = visibleTextStartingWith('Mail batch ');
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 300));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    final refreshedMailboxSubject = visibleTextStartingWith('Mail batch ');
+    expect(refreshedMailboxSubject, isNot(initialMailboxSubject));
+
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.pumpAndSettle();
+    final initialOrderReference = visibleTextStartingWith('PO-');
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 300));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    final refreshedOrderReference = visibleTextStartingWith('PO-');
+    expect(refreshedOrderReference, isNot(initialOrderReference));
   });
 
   testWidgets('dashboard uses backend counts instead of first-page list length', (
@@ -1984,7 +2189,9 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Odjava'));
+    await tester.tap(find.byKey(const Key('home-avatar-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Odjava'));
     await tester.pumpAndSettle();
 
     expect(find.text('Prijava'), findsOneWidget);

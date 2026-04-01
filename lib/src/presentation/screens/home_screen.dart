@@ -75,17 +75,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _purchaseOrdersController.load(token);
   }
 
-  void _refreshCurrentTab() {
+  String get _currentTitle {
     switch (_index) {
-      case 0:
-        _dashboardController.load(widget.session.token);
-        return;
       case 1:
-        _mailboxController.load(widget.session.token);
-        return;
+        return 'Poruke';
       case 2:
-        _purchaseOrdersController.load(widget.session.token);
-        return;
+        return 'Narudzbe';
+      case 0:
+      default:
+        return 'Pocetna';
     }
   }
 
@@ -117,6 +115,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _refreshPurchaseOrders() async {
     await _purchaseOrdersController.load(widget.session.token);
+  }
+
+  Future<void> _refreshDashboard() async {
+    await _dashboardController.load(widget.session.token);
+  }
+
+  Future<void> _refreshMailbox() async {
+    await _mailboxController.load(widget.session.token);
+  }
+
+  void _setTabIndex(int index) {
+    if (_index == index) {
+      return;
+    }
+    setState(() {
+      _index = index;
+    });
   }
 
   void _syncSelectedOrder() {
@@ -163,14 +178,16 @@ class _HomeScreenState extends State<HomeScreen> {
         valueListenable: _dashboardController,
         builder: (context, state, _) => _DashboardTab(
           state: state,
-          onRetry: _loadAll,
+          onRetry: _refreshDashboard,
+          onOpenPurchaseOrders: () => _setTabIndex(2),
+          onOpenMailbox: () => _setTabIndex(1),
         ),
       ),
       ValueListenableBuilder<MailboxState>(
         valueListenable: _mailboxController,
         builder: (context, state, _) => _MailboxTab(
           state: state,
-          onRetry: _loadAll,
+          onRetry: _refreshMailbox,
           onLoadMore: () => _mailboxController.loadMore(widget.session.token),
           repository: widget.mailboxRepository,
           session: widget.session,
@@ -180,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
         valueListenable: _purchaseOrdersController,
         builder: (context, state, _) => _PurchaseOrdersTab(
           state: state,
-          onRetry: _loadAll,
+          onRetry: _refreshPurchaseOrders,
           onLoadMore: () => _purchaseOrdersController.loadMore(widget.session.token),
           onOpenFilters: () => _showPurchaseOrderFilters(state),
           onResetFilters: _resetPurchaseOrderFilters,
@@ -208,28 +225,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Mozart Mobile',
-                style: Theme.of(context).textTheme.titleLarge,
+        title: Text(_currentTitle),
+        actions: [
+          PopupMenuButton<_HomeMenuAction>(
+            key: const Key('home-avatar-menu'),
+            tooltip: 'Korisnik',
+            onSelected: (action) {
+              if (action == _HomeMenuAction.logout) {
+                sessionController.logout();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<_HomeMenuAction>(
+                value: _HomeMenuAction.logout,
+                child: Text('Odjava'),
+              ),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.14),
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                child: Text(
+                  widget.session.initials,
+                  key: const Key('home-avatar-initials'),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            _SessionIdentityBadge(session: widget.session),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: _refreshCurrentTab,
-            tooltip: 'Osvjezi',
-            icon: const Icon(Icons.refresh),
-          ),
-          IconButton(
-            onPressed: sessionController.logout,
-            tooltip: 'Odjava',
-            icon: const Icon(Icons.logout),
           ),
         ],
       ),
@@ -266,43 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _SessionIdentityBadge extends StatelessWidget {
-  const _SessionIdentityBadge({required this.session});
-
-  final UserSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.12),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            session.displayName,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          Text(
-            session.secondaryIdentity,
-            style: theme.textTheme.bodySmall,
-          ),
-        ],
-      ),
-    );
-  }
-}
+enum _HomeMenuAction { logout }
 
 class _PageFrame extends StatelessWidget {
   const _PageFrame({required this.child});
@@ -344,14 +337,17 @@ class _DashboardTab extends StatelessWidget {
   const _DashboardTab({
     required this.state,
     required this.onRetry,
+    required this.onOpenPurchaseOrders,
+    required this.onOpenMailbox,
   });
 
   final DashboardState state;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
+  final VoidCallback onOpenPurchaseOrders;
+  final VoidCallback onOpenMailbox;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final summary = state.summary;
     final screenWidth = MediaQuery.of(context).size.width;
     final crossAxisCount = screenWidth >= 900
@@ -365,31 +361,30 @@ class _DashboardTab extends StatelessWidget {
         '${summary?.openPurchaseOrders ?? 0}',
         Icons.inventory_2,
         const Color(0xFFF3E2D4),
+        onOpenPurchaseOrders,
       ),
       (
         'Kreirane',
         '${summary?.pendingApprovals ?? 0}',
         Icons.gpp_good,
         const Color(0xFFE2ECE0),
+        onOpenPurchaseOrders,
       ),
       (
         'Poruke',
         '${summary?.totalMessages ?? 0}',
         Icons.mail_outline,
         const Color(0xFFF6E8D8),
+        onOpenMailbox,
       ),
     ];
 
     return _PageFrame(
-      child: ListView(
-        children: [
-          Text('Pocetna', style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 6),
-          Text(
-            'Pregled najvaznijih obaveza i stanja za danasnji rad.',
-            style: theme.textTheme.bodyLarge,
-          ),
-          const SizedBox(height: 14),
+      child: RefreshIndicator(
+        onRefresh: onRetry,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
           if (state.errorMessage != null) _ErrorBanner(message: state.errorMessage!),
           if (state.isLoading)
             const Padding(
@@ -408,7 +403,7 @@ class _DashboardTab extends StatelessWidget {
               title: 'Pocetna nije dostupna',
               message: state.errorMessage!,
               actionLabel: 'Pokusaj ponovno',
-              onAction: onRetry,
+              onAction: () => onRetry(),
             )
           else if (!state.hasContent)
             _TabStateCard(
@@ -416,72 +411,33 @@ class _DashboardTab extends StatelessWidget {
               title: 'Nema podataka za prikaz',
               message: 'Pocetna ce se pojaviti cim stignu novi podaci.',
               actionLabel: 'Osvjezi',
-              onAction: onRetry,
+              onAction: () => onRetry(),
             )
           else ...[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.insights,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Brzi pregled',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Najbitnije stavke su odmah dostupne bez dodatnog skrolanja.',
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: tiles.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: screenWidth < 420 ? 1.18 : 1.32,
               ),
+              itemBuilder: (context, index) {
+                final tile = tiles[index];
+                return _DashboardMetricCard(
+                  label: tile.$1,
+                  value: tile.$2,
+                  icon: tile.$3,
+                  tone: tile.$4,
+                  onTap: tile.$5,
+                );
+              },
             ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: tiles.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: screenWidth < 420 ? 1.18 : 1.32,
-            ),
-            itemBuilder: (context, index) {
-              final tile = tiles[index];
-              return _DashboardMetricCard(
-                label: tile.$1,
-                value: tile.$2,
-                icon: tile.$3,
-                tone: tile.$4,
-              );
-            },
-          ),
           ],
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -493,52 +449,58 @@ class _DashboardMetricCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.tone,
+    required this.onTap,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final Color tone;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: tone,
-                borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(28),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: tone,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: theme.colorScheme.onSurface,
+              const Spacer(),
+              Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const Spacer(),
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 6),
+              Text(
+                value,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontSize: 26,
+                  height: 1,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontSize: 26,
-                height: 1,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -555,7 +517,7 @@ class _MailboxTab extends StatelessWidget {
   });
 
   final MailboxState state;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
   final Future<void> Function() onLoadMore;
   final MailboxRepository repository;
   final UserSession session;
@@ -566,31 +528,34 @@ class _MailboxTab extends StatelessWidget {
     final dateTimeFormat = DateFormat('dd.MM.yyyy. HH:mm', 'hr_HR');
 
     return _PageFrame(
-      child: ListView.separated(
-        itemCount: state.messages.isEmpty
+      child: RefreshIndicator(
+        onRefresh: onRetry,
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: state.messages.isEmpty
             ? 2
             : state.messages.length + 1 + (state.hasMorePages ? 1 : 0),
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Poruke', style: theme.textTheme.headlineMedium),
-                const SizedBox(height: 8),
-                Text(
-                  'Pregledajte nove poruke i priloge na jednom mjestu.',
-                  style: theme.textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 16),
-                if (state.errorMessage != null && state.hasContent)
-                  _ErrorBanner(message: state.errorMessage!),
-                if (state.isLoading && state.hasContent)
-                  const LinearProgressIndicator(),
-                if (state.isLoading && state.hasContent) const SizedBox(height: 16),
-              ],
-            );
-          }
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Poruke', style: theme.textTheme.headlineMedium),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Pregledajte nove poruke i priloge na jednom mjestu.',
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  if (state.errorMessage != null && state.hasContent)
+                    _ErrorBanner(message: state.errorMessage!),
+                  if (state.isLoading && state.hasContent)
+                    const LinearProgressIndicator(),
+                  if (state.isLoading && state.hasContent) const SizedBox(height: 16),
+                ],
+              );
+            }
 
           if (index == 1 && state.isLoading && !state.hasContent) {
             return const _TabStateCard(
@@ -606,7 +571,7 @@ class _MailboxTab extends StatelessWidget {
               title: 'Poruke nisu dostupne',
               message: state.errorMessage!,
               actionLabel: 'Pokusaj ponovno',
-              onAction: onRetry,
+              onAction: () => onRetry(),
             );
           }
 
@@ -616,7 +581,7 @@ class _MailboxTab extends StatelessWidget {
               title: 'Nema poruka',
               message: 'Trenutno nema novih poruka u sanducicu.',
               actionLabel: 'Osvjezi',
-              onAction: onRetry,
+              onAction: () => onRetry(),
             );
           }
 
@@ -673,7 +638,8 @@ class _MailboxTab extends StatelessWidget {
               },
             ),
           );
-        },
+          },
+        ),
       ),
     );
   }
@@ -731,7 +697,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
   });
 
   final PurchaseOrdersState state;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
   final Future<void> Function() onLoadMore;
   final VoidCallback onOpenFilters;
   final VoidCallback onResetFilters;
@@ -829,7 +795,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
             title: 'Narudzbe nisu dostupne',
             message: state.errorMessage!,
             actionLabel: 'Pokusaj ponovno',
-            onAction: onRetry,
+            onAction: () => onRetry(),
           )
         else if (!state.hasContent)
           _TabStateCard(
@@ -837,7 +803,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
             title: 'Nema aktivnih narudzbi',
             message: 'Kad stignu nove narudzbe, ovdje ce biti prikazane.',
             actionLabel: 'Osvjezi',
-            onAction: onRetry,
+            onAction: () => onRetry(),
           )
         else
           ...state.orders.map(
@@ -901,36 +867,50 @@ class _PurchaseOrdersTab extends StatelessWidget {
 
     return _PageFrame(
       child: isWide
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: SingleChildScrollView(child: list)),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: selectedOrder == null
-                      ? const Card(
-                          child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text(
-                              'Odaberite narudzbu za pregled detalja.',
-                            ),
-                          ),
-                        )
-                      : Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: PurchaseOrderDetailPane(
-                              orderId: selectedOrder.id,
-                              session: session,
-                              repository: repository,
-                              onOrderChanged: onOrderChanged,
-                            ),
-                          ),
-                        ),
-                ),
-              ],
+          ? RefreshIndicator(
+              onRefresh: onRetry,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: SingleChildScrollView(child: list)),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: selectedOrder == null
+                            ? const Card(
+                                child: Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Text(
+                                    'Odaberite narudzbu za pregled detalja.',
+                                  ),
+                                ),
+                              )
+                            : Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: PurchaseOrderDetailPane(
+                                    orderId: selectedOrder.id,
+                                    session: session,
+                                    repository: repository,
+                                    onOrderChanged: onOrderChanged,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             )
-          : ListView(children: [list]),
+          : RefreshIndicator(
+              onRefresh: onRetry,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [list],
+              ),
+            ),
     );
   }
 }
