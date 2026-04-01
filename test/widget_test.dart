@@ -721,6 +721,10 @@ void main() {
           'payment_type': 6,
           'payment_type_name': 'Karticno',
           'ordered_at': '2026-04-02T11:30:00Z',
+          'created_by': 'Ana Admin',
+          'sent_at': '2026-04-02T12:00:00Z',
+          'updated_at': '2026-04-03T09:15:00Z',
+          'primka_created': true,
           'currency': 'EUR',
           'total_net': '15000.00',
           'total_gross': '18420.50',
@@ -757,10 +761,26 @@ void main() {
     expect(find.text('Detalji narudzbe'), findsOneWidget);
     expect(find.text('Narudzba PO-2048'), findsOneWidget);
     expect(find.text('Blue Harbor Supply'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('Ukupni iznosi'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Ukupni iznosi'), findsOneWidget);
     expect(find.textContaining('EUR 15.000,00'), findsOneWidget);
     expect(find.textContaining('EUR 18.420,50'), findsOneWidget);
     expect(find.textContaining('EUR 85,00'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Povijest statusa'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Povijest statusa'), findsOneWidget);
+    expect(find.text('Narudzba kreirana'), findsOneWidget);
+    expect(find.text('Narudzba poslana'), findsOneWidget);
+    expect(find.text('Primka kreirana'), findsOneWidget);
+    expect(find.text('Trenutni status'), findsOneWidget);
+    expect(find.text('Kreirao: Ana Admin'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.textContaining('Coffee beans'),
       200,

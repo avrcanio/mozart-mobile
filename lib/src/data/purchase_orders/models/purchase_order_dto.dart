@@ -14,6 +14,10 @@ class PurchaseOrderDto {
     required this.totalNetAmount,
     required this.totalGrossAmount,
     required this.totalDepositAmount,
+    required this.createdBy,
+    required this.sentAt,
+    required this.updatedAt,
+    required this.receiptCreated,
     required this.currency,
     required this.orderedAt,
     required this.lines,
@@ -31,6 +35,10 @@ class PurchaseOrderDto {
   final double totalNetAmount;
   final double totalGrossAmount;
   final double totalDepositAmount;
+  final String createdBy;
+  final DateTime? sentAt;
+  final DateTime? updatedAt;
+  final bool receiptCreated;
   final String currency;
   final DateTime? orderedAt;
   final List<PurchaseOrderLineDto> lines;
@@ -94,6 +102,10 @@ class PurchaseOrderDto {
       totalDepositAmount: _asDouble(
         json['total_deposit'] ?? json['deposit_total'],
       ),
+      createdBy: (json['created_by'] ?? '').toString().trim(),
+      sentAt: _asDateTime(json['sent_at']),
+      updatedAt: _asDateTime(json['updated_at']),
+      receiptCreated: _asBool(json['primka_created']),
       currency: (json['currency'] ?? 'EUR').toString(),
       orderedAt: _asDateTime(json['ordered_at'] ?? json['created_at']),
       lines: lines,
@@ -115,6 +127,11 @@ class PurchaseOrderDto {
       totalNetAmount: totalNetAmount,
       totalGrossAmount: totalGrossAmount == 0 ? totalAmount : totalGrossAmount,
       totalDepositAmount: totalDepositAmount,
+      createdBy: createdBy,
+      sentAt: sentAt,
+      updatedAt: updatedAt,
+      receiptCreated: receiptCreated,
+      history: _buildHistory(),
       currency: currency,
       orderedAt: orderedAt,
       lines: lines.map((line) => line.toDomain()).toList(),
@@ -152,6 +169,17 @@ class PurchaseOrderDto {
     return DateTime.tryParse(value.toString());
   }
 
+  static bool _asBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized == 'true' || normalized == '1';
+  }
+
   static String _asLabel(
     dynamic value, {
     dynamic fallback,
@@ -166,6 +194,72 @@ class PurchaseOrderDto {
       return secondary;
     }
     return emptyFallback;
+  }
+
+  List<PurchaseOrderHistoryEntry> _buildHistory() {
+    final entries = <PurchaseOrderHistoryEntry>[
+      PurchaseOrderHistoryEntry(
+        title: 'Narudzba kreirana',
+        description: createdBy.isEmpty
+            ? 'Narudzba je evidentirana u sustavu.'
+            : 'Kreirao: $createdBy',
+        occurredAt: orderedAt,
+      ),
+    ];
+
+    if (sentAt != null) {
+      entries.add(
+        PurchaseOrderHistoryEntry(
+          title: 'Narudzba poslana',
+          description: 'Narudzba je poslana dobavljacu.',
+          occurredAt: sentAt,
+        ),
+      );
+    }
+
+    if (receiptCreated) {
+      entries.add(
+        PurchaseOrderHistoryEntry(
+          title: 'Primka kreirana',
+          description: 'Za ovu narudzbu je kreirana primka robe.',
+          occurredAt: updatedAt,
+        ),
+      );
+    }
+
+    final currentStatusAt = updatedAt ?? sentAt ?? orderedAt;
+    final hasDistinctCurrentStatus = entries.every(
+      (entry) =>
+          entry.title != 'Trenutni status' ||
+          entry.description != statusLabel ||
+          entry.occurredAt != currentStatusAt,
+    );
+    if (statusLabel.trim().isNotEmpty && hasDistinctCurrentStatus) {
+      entries.add(
+        PurchaseOrderHistoryEntry(
+          title: 'Trenutni status',
+          description: statusLabel,
+          occurredAt: currentStatusAt,
+        ),
+      );
+    }
+
+    entries.sort((left, right) {
+      final leftAt = left.occurredAt;
+      final rightAt = right.occurredAt;
+      if (leftAt == null && rightAt == null) {
+        return 0;
+      }
+      if (leftAt == null) {
+        return 1;
+      }
+      if (rightAt == null) {
+        return -1;
+      }
+      return rightAt.compareTo(leftAt);
+    });
+
+    return entries;
   }
 }
 

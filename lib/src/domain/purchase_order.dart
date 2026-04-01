@@ -12,6 +12,11 @@ class PurchaseOrder {
     this.totalNetAmount = 0,
     this.totalGrossAmount = 0,
     this.totalDepositAmount = 0,
+    this.createdBy = '',
+    this.sentAt,
+    this.updatedAt,
+    this.receiptCreated = false,
+    this.history = const <PurchaseOrderHistoryEntry>[],
     required this.currency,
     required this.orderedAt,
     required this.lines,
@@ -29,6 +34,11 @@ class PurchaseOrder {
   final double totalNetAmount;
   final double totalGrossAmount;
   final double totalDepositAmount;
+  final String createdBy;
+  final DateTime? sentAt;
+  final DateTime? updatedAt;
+  final bool receiptCreated;
+  final List<PurchaseOrderHistoryEntry> history;
   final String currency;
   final DateTime? orderedAt;
   final List<PurchaseOrderLine> lines;
@@ -40,6 +50,18 @@ class PurchaseOrder {
       lines.fold(0, (sum, line) => sum + line.remainingQuantity);
 
   bool get canSend => status == 'created';
+}
+
+class PurchaseOrderHistoryEntry {
+  const PurchaseOrderHistoryEntry({
+    required this.title,
+    required this.description,
+    required this.occurredAt,
+  });
+
+  final String title;
+  final String description;
+  final DateTime? occurredAt;
 }
 
 class PurchaseOrderLine {

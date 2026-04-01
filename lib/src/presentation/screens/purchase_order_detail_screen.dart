@@ -381,6 +381,46 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                   label: 'Datum',
                   value: _formatDate(order.orderedAt, dateFormat),
                 ),
+                if (order.createdBy.isNotEmpty)
+                  _DetailRow(
+                    label: 'Kreirao',
+                    value: order.createdBy,
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Povijest statusa',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Kratki pregled kako je narudzba dosla do trenutnog stanja.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 14),
+                if (order.history.length <= 1)
+                  const Text(
+                    'Dodatna povijest ce se prikazati cim backend posalje vise audit podataka za ovu narudzbu.',
+                  )
+                else
+                  ...order.history.map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _HistoryEntryTile(
+                        entry: entry,
+                        dateFormat: dateFormat,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -566,6 +606,59 @@ class _LineItemCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HistoryEntryTile extends StatelessWidget {
+  const _HistoryEntryTile({
+    required this.entry,
+    required this.dateFormat,
+  });
+
+  final PurchaseOrderHistoryEntry entry;
+  final DateFormat dateFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          margin: const EdgeInsets.only(top: 4),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entry.title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(entry.description),
+              const SizedBox(height: 4),
+              Text(
+                entry.occurredAt == null
+                    ? 'Vrijeme nije dostupno'
+                    : _formatDateTime(entry.occurredAt!, dateFormat),
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -777,6 +870,11 @@ String _formatDate(DateTime? value, DateFormat formatter) {
     return 'Bez datuma';
   }
   return formatter.format(value.toLocal());
+}
+
+String _formatDateTime(DateTime value, DateFormat formatter) {
+  final time = DateFormat('HH:mm', 'hr_HR');
+  return '${formatter.format(value.toLocal())} ${time.format(value.toLocal())}';
 }
 
 String _formatMoney(double value, String currency, NumberFormat formatter) {
