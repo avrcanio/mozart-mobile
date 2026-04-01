@@ -693,7 +693,7 @@ class _MailboxAttachmentCount extends StatelessWidget {
   }
 }
 
-class _PurchaseOrdersTab extends StatelessWidget {
+class _PurchaseOrdersTab extends StatefulWidget {
   const _PurchaseOrdersTab({
     required this.state,
     required this.onRetry,
@@ -720,16 +720,115 @@ class _PurchaseOrdersTab extends StatelessWidget {
   final PurchaseOrder? selectedOrderDetail;
   final ValueChanged<int> onSelect;
 
-  static const double _loadMoreTriggerExtent = 480;
+  @override
+  State<_PurchaseOrdersTab> createState() => _PurchaseOrdersTabState();
+}
+
+class _PurchaseOrdersTabState extends State<_PurchaseOrdersTab> {
+  static const double _loadMoreTriggerExtent = 900;
+
+  final ScrollController _mobileScrollController = ScrollController();
+  final ScrollController _wideListScrollController = ScrollController();
+
+  bool _prefetchScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _mobileScrollController.addListener(_handleMobileScroll);
+    _wideListScrollController.addListener(_handleWideListScroll);
+    _schedulePrefetchCheck();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PurchaseOrdersTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.state.orders.length != oldWidget.state.orders.length ||
+        widget.state.isLoading != oldWidget.state.isLoading ||
+        widget.state.isLoadingMore != oldWidget.state.isLoadingMore ||
+        widget.state.hasMorePages != oldWidget.state.hasMorePages ||
+        widget.state.nextPageUrl != oldWidget.state.nextPageUrl) {
+      _schedulePrefetchCheck();
+    }
+  }
+
+  @override
+  void dispose() {
+    _mobileScrollController
+      ..removeListener(_handleMobileScroll)
+      ..dispose();
+    _wideListScrollController
+      ..removeListener(_handleWideListScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleMobileScroll() {
+    _maybeLoadMoreForController(_mobileScrollController);
+  }
+
+  void _handleWideListScroll() {
+    _maybeLoadMoreForController(_wideListScrollController);
+  }
+
+  void _maybeLoadMoreForController(ScrollController controller) {
+    if (!controller.hasClients) {
+      return;
+    }
+    if (controller.position.extentAfter > _loadMoreTriggerExtent) {
+      return;
+    }
+    widget.onLoadMore();
+  }
+
+  void _schedulePrefetchCheck() {
+    if (_prefetchScheduled) {
+      return;
+    }
+    _prefetchScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefetchScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      _maybePrefetchIfNeeded();
+    });
+  }
+
+  void _maybePrefetchIfNeeded() {
+    if (widget.state.isLoading ||
+        widget.state.isLoadingMore ||
+        !widget.state.hasMorePages) {
+      return;
+    }
+
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final viewportHeight = mediaQuery?.size.height ?? 0;
+    final controller = (mediaQuery?.size.width ?? 0) >= 900
+        ? _wideListScrollController
+        : _mobileScrollController;
+
+    if (!controller.hasClients) {
+      return;
+    }
+
+    final maxScrollExtent = controller.position.maxScrollExtent;
+    final extentAfter = controller.position.extentAfter;
+    final contentShorterThanViewport = maxScrollExtent <= viewportHeight * 0.35;
+
+    if (contentShorterThanViewport || extentAfter <= _loadMoreTriggerExtent) {
+      widget.onLoadMore();
+    }
+  }
 
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification.metrics.extentAfter > _loadMoreTriggerExtent) {
-      return false;
-    }
     if (notification is ScrollUpdateNotification ||
         notification is OverscrollNotification ||
         notification is UserScrollNotification) {
-      onLoadMore();
+      final controller = (MediaQuery.maybeOf(context)?.size.width ?? 0) >= 900
+          ? _wideListScrollController
+          : _mobileScrollController;
+      _maybeLoadMoreForController(controller);
     }
     return false;
   }
@@ -742,8 +841,8 @@ class _PurchaseOrdersTab extends StatelessWidget {
       symbol: '',
       decimalDigits: 2,
     );
-    final selectedOrder = selectedOrderDetail;
-    final sections = _buildPurchaseOrderSections(state.orders);
+    final selectedOrder = widget.selectedOrderDetail;
+    final sections = _buildPurchaseOrderSections(widget.state.orders);
 
     final list = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -751,16 +850,16 @@ class _PurchaseOrdersTab extends StatelessWidget {
         Row(
           children: [
             OutlinedButton.icon(
-              onPressed: onOpenFilters,
+              onPressed: widget.onOpenFilters,
               icon: const Icon(Icons.tune),
               label: Text(
-                state.hasActiveFilters ? 'Filteri aktivni' : 'Filteri',
+                widget.state.hasActiveFilters ? 'Filteri aktivni' : 'Filteri',
               ),
             ),
-            if (state.hasActiveFilters) ...[
+            if (widget.state.hasActiveFilters) ...[
               const SizedBox(width: 8),
               TextButton(
-                onPressed: onResetFilters,
+                onPressed: widget.onResetFilters,
                 child: const Text('Reset'),
               ),
             ],
@@ -770,14 +869,14 @@ class _PurchaseOrdersTab extends StatelessWidget {
                 final created = await Navigator.of(context).push<PurchaseOrder>(
                   MaterialPageRoute<PurchaseOrder>(
                     builder: (context) => PurchaseOrderFormScreen(
-                      session: session,
-                      repository: repository,
-                      onSaved: (_) => onOrderChanged(),
+                      session: widget.session,
+                      repository: widget.repository,
+                      onSaved: (_) => widget.onOrderChanged(),
                     ),
                   ),
                 );
                 if (created != null) {
-                  onSelect(created.id);
+                  widget.onSelect(created.id);
                 }
               },
               icon: const Icon(Icons.add),
@@ -785,43 +884,43 @@ class _PurchaseOrdersTab extends StatelessWidget {
             ),
           ],
         ),
-        if (state.hasActiveFilters) ...[
+        if (widget.state.hasActiveFilters) ...[
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _buildFilterChips(state.filters, state.suppliers),
+            children: _buildFilterChips(widget.state.filters, widget.state.suppliers),
           ),
           const SizedBox(height: 16),
         ],
-        if (state.errorMessage != null && state.hasContent)
-          _ErrorBanner(message: state.errorMessage!),
-        if (state.isLoading && state.hasContent)
+        if (widget.state.errorMessage != null && widget.state.hasContent)
+          _ErrorBanner(message: widget.state.errorMessage!),
+        if (widget.state.isLoading && widget.state.hasContent)
           const Padding(
             padding: EdgeInsets.only(bottom: 16),
             child: LinearProgressIndicator(),
           ),
-        if (state.isLoading && !state.hasContent)
+        if (widget.state.isLoading && !widget.state.hasContent)
           const _TabStateCard(
             icon: Icons.receipt_long_outlined,
             title: 'U\u010Ditavanje narud\u017Ebi',
             message: 'Pripremamo pregled aktivnih narud\u017Ebi.',
           )
-        else if (state.errorMessage != null && !state.hasContent)
+        else if (widget.state.errorMessage != null && !widget.state.hasContent)
           _TabStateCard(
             icon: Icons.receipt_long_outlined,
             title: 'Narud\u017Ebe nisu dostupne',
-            message: state.errorMessage!,
+            message: widget.state.errorMessage!,
             actionLabel: 'Poku\u0161aj ponovno',
-            onAction: () => onRetry(),
+            onAction: () => widget.onRetry(),
           )
-        else if (!state.hasContent)
+        else if (!widget.state.hasContent)
           _TabStateCard(
             icon: Icons.playlist_add_check_circle_outlined,
             title: 'Nema aktivnih narud\u017Ebi',
             message: 'Kad stignu nove narud\u017Ebe, ovdje \u0107e biti prikazane.',
             actionLabel: 'Osvje\u017Ei',
-            onAction: () => onRetry(),
+            onAction: () => widget.onRetry(),
           )
         else
           ...sections.expand(
@@ -841,17 +940,17 @@ class _PurchaseOrdersTab extends StatelessWidget {
                           currencyFormat: currencyFormat,
                         ),
                       ),
-                      selected: selectedOrderId == order.id,
+                      selected: widget.selectedOrderId == order.id,
                       onTap: () {
-                        onSelect(order.id);
+                        widget.onSelect(order.id);
                         if (!isWide) {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
                               builder: (context) => PurchaseOrderDetailScreen(
                                 orderId: order.id,
-                                session: session,
-                                repository: repository,
-                                onOrderChanged: onOrderChanged,
+                                session: widget.session,
+                                repository: widget.repository,
+                                onOrderChanged: widget.onOrderChanged,
                               ),
                             ),
                           );
@@ -863,13 +962,13 @@ class _PurchaseOrdersTab extends StatelessWidget {
               ),
             ],
           ),
-        if (state.loadMoreErrorMessage != null) ...[
+        if (widget.state.loadMoreErrorMessage != null) ...[
           const SizedBox(height: 8),
-          _ErrorBanner(message: state.loadMoreErrorMessage!),
+          _ErrorBanner(message: widget.state.loadMoreErrorMessage!),
         ],
-        if (state.hasContent && state.hasMorePages) ...[
+        if (widget.state.hasContent && widget.state.hasMorePages) ...[
           const SizedBox(height: 4),
-          if (state.isLoadingMore)
+          if (widget.state.isLoadingMore)
             const Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: Center(
@@ -882,7 +981,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
             ),
           const SizedBox(height: 8),
           Text(
-            'Prikazano ${state.orders.length} od ${state.totalCount} narud\u017Ebi.',
+            'Prikazano ${widget.state.orders.length} od ${widget.state.totalCount} narud\u017Ebi.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -892,7 +991,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
     return _PageFrame(
       child: isWide
           ? RefreshIndicator(
-              onRefresh: onRetry,
+              onRefresh: widget.onRetry,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
@@ -902,7 +1001,10 @@ class _PurchaseOrdersTab extends StatelessWidget {
                       Expanded(
                         child: NotificationListener<ScrollNotification>(
                           onNotification: _handleScrollNotification,
-                          child: SingleChildScrollView(child: list),
+                          child: SingleChildScrollView(
+                            controller: _wideListScrollController,
+                            child: list,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -921,9 +1023,9 @@ class _PurchaseOrdersTab extends StatelessWidget {
                                   padding: const EdgeInsets.all(8),
                                   child: PurchaseOrderDetailPane(
                                     orderId: selectedOrder.id,
-                                    session: session,
-                                    repository: repository,
-                                    onOrderChanged: onOrderChanged,
+                                    session: widget.session,
+                                    repository: widget.repository,
+                                    onOrderChanged: widget.onOrderChanged,
                                   ),
                                 ),
                               )
@@ -934,10 +1036,11 @@ class _PurchaseOrdersTab extends StatelessWidget {
               ),
             )
           : RefreshIndicator(
-              onRefresh: onRetry,
+              onRefresh: widget.onRetry,
               child: NotificationListener<ScrollNotification>(
                 onNotification: _handleScrollNotification,
                 child: ListView(
+                  controller: _mobileScrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [list],
                 ),

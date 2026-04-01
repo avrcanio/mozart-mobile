@@ -2172,7 +2172,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(find.textContaining('PO-BASE'), findsNothing);
   });
 
-  testWidgets('loads additional purchase order pages on demand', (
+  testWidgets('auto-loads additional purchase order pages near list end', (
     tester,
   ) async {
     final harness = await _createHarness(
@@ -2250,8 +2250,8 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
 
     expect(find.textContaining('PO-001'), findsOneWidget);
     expect(find.textContaining('PO-002'), findsOneWidget);
-    expect(find.textContaining('PO-003'), findsNothing);
-    expect(find.text('Prikazano 2 od 3 narudžbi.'), findsOneWidget);
+    expect(find.textContaining('PO-003'), findsOneWidget);
+    expect(find.text('Prikazano 2 od 3 narudžbi.'), findsNothing);
 
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -900));
     await tester.pump();
@@ -2261,7 +2261,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(find.text('Prikazano 3 od 3 narudžbi.'), findsNothing);
   });
 
-  testWidgets('keeps active filters applied across purchase order pagination', (
+  testWidgets('keeps active filters applied across auto-loaded purchase order pagination', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 1400);
@@ -2372,7 +2372,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
 
     expect(find.textContaining('PO-SENT-1'), findsOneWidget);
     expect(find.textContaining('PO-SENT-2'), findsOneWidget);
-    expect(find.textContaining('PO-SENT-3'), findsNothing);
+    expect(find.textContaining('PO-SENT-3'), findsOneWidget);
     expect(find.text('Status: Poslana'), findsOneWidget);
 
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -900));
@@ -2381,6 +2381,130 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
 
     expect(find.textContaining('PO-SENT-3'), findsOneWidget);
     expect(find.text('Status: Poslana'), findsOneWidget);
+  });
+
+  testWidgets('ignores stale purchase order load-more results after filter changes', (
+    tester,
+  ) async {
+    final stalePageCompleter = Completer<_FakeResponse>();
+    var stalePageRequested = 0;
+
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _jsonPaginatedResponse(
+          count: 4,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 120,
+              'reference': 'PO-UNFILTERED-120',
+              'supplier_name': 'Fructus d.o.o.',
+              'status': 'received_all',
+              'status_display': 'Sve stavke s narudžbe su zaprimljene',
+              'payment_type_name': 'Gotovina',
+              'ordered_at': '2026-03-19T09:30:00Z',
+              'total_gross': '41.77',
+              'items': <Map<String, dynamic>>[],
+            },
+            <String, dynamic>{
+              'id': 121,
+              'reference': 'PO-UNFILTERED-121',
+              'supplier_name': 'Koktel Ugostiteljstvo d.o.o.',
+              'status': 'received_all',
+              'status_display': 'Sve stavke s narudžbe su zaprimljene',
+              'payment_type_name': 'Gotovina',
+              'ordered_at': '2026-03-18T09:30:00Z',
+              'total_gross': '13.80',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/?page=2': (ApiRequest request) async {
+          stalePageRequested += 1;
+          return stalePageCompleter.future;
+        },
+        'GET /api/purchase-orders/?status=confirmed': _jsonPaginatedResponse(
+          count: 0,
+          results: <Map<String, dynamic>>[],
+        ),
+        'GET /api/purchase-orders/?status=created&status=sent': _jsonPaginatedResponse(
+          count: 1,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 143,
+              'reference': 'PO-FRESH-143',
+              'supplier_name': 'Koktel Ugostiteljstvo d.o.o.',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '2.86',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(stalePageRequested, 1);
+
+    await tester.tap(_navigationDestinationFinder('Početna'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Kreirane i poslane').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Status: Kreirana'), findsOneWidget);
+    expect(find.text('Status: Poslana'), findsOneWidget);
+    expect(find.textContaining('PO-FRESH-143'), findsOneWidget);
+    expect(find.textContaining('PO-UNFILTERED-120'), findsNothing);
+    expect(find.textContaining('PO-UNFILTERED-121'), findsNothing);
+
+    stalePageCompleter.complete(
+      _jsonPaginatedResponse(
+        count: 4,
+        results: <Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 11,
+            'reference': 'PO-STALE-11',
+            'supplier_name': 'Koktel Ugostiteljstvo d.o.o.',
+            'status': 'received_all',
+            'status_display': 'Sve stavke s narudžbe su zaprimljene',
+            'payment_type_name': 'Gotovina',
+            'ordered_at': '2026-01-03T09:30:00Z',
+            'total_gross': '237.27',
+            'items': <Map<String, dynamic>>[],
+          },
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('PO-FRESH-143'), findsOneWidget);
+    expect(find.textContaining('PO-STALE-11'), findsNothing);
   });
 
   testWidgets('logout removes persisted token', (tester) async {

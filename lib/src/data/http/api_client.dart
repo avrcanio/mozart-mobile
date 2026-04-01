@@ -38,6 +38,20 @@ class ApiClient {
     return _decodeMap(response);
   }
 
+  Future<JsonMap> getJsonUri(
+    Uri uri, {
+    String? authToken,
+  }) async {
+    final response = await _send(
+      ApiRequest(
+        method: 'GET',
+        uri: uri,
+        headers: _headers(authToken: authToken),
+      ),
+    );
+    return _decodeMap(response);
+  }
+
   Future<List<dynamic>> getJsonList(
     String path, {
     String? authToken,

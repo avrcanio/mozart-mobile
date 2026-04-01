@@ -59,6 +59,30 @@ class PurchaseOrderRepository {
     return PurchaseOrderPage(
       count: _asCount(json['count'], fallback: orders.length),
       orders: orders,
+      nextPageUrl: _asNextPageUrl(json['next']),
+      previousPageUrl: _asNextPageUrl(json['previous']),
+    );
+  }
+
+  Future<PurchaseOrderPage> fetchPurchaseOrdersPageByUrl({
+    required String authToken,
+    required String pageUrl,
+  }) async {
+    final json = await _apiClient.getJsonUri(
+      Uri.parse(pageUrl),
+      authToken: authToken,
+    );
+    final orders = (json['results'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(PurchaseOrderDto.fromJson)
+        .map((dto) => dto.toDomain())
+        .toList();
+
+    return PurchaseOrderPage(
+      count: _asCount(json['count'], fallback: orders.length),
+      orders: orders,
+      nextPageUrl: _asNextPageUrl(json['next']),
+      previousPageUrl: _asNextPageUrl(json['previous']),
     );
   }
 
@@ -212,14 +236,25 @@ class PurchaseOrderRepository {
     }
     return int.tryParse((value ?? '').toString()) ?? fallback;
   }
+
+  static String? _asNextPageUrl(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+    return null;
+  }
 }
 
 class PurchaseOrderPage {
   const PurchaseOrderPage({
     required this.count,
     required this.orders,
+    required this.nextPageUrl,
+    required this.previousPageUrl,
   });
 
   final int count;
   final List<PurchaseOrder> orders;
+  final String? nextPageUrl;
+  final String? previousPageUrl;
 }

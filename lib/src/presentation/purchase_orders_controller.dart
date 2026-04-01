@@ -16,6 +16,7 @@ class PurchaseOrdersState {
     required this.isLoadingSuppliers,
     required this.currentPage,
     required this.totalCount,
+    required this.nextPageUrl,
     required this.loadMoreErrorMessage,
     required this.errorMessage,
   });
@@ -29,6 +30,7 @@ class PurchaseOrdersState {
         isLoadingSuppliers = false,
         currentPage = 0,
         totalCount = 0,
+        nextPageUrl = null,
         loadMoreErrorMessage = null,
         errorMessage = null;
 
@@ -40,12 +42,13 @@ class PurchaseOrdersState {
   final bool isLoadingSuppliers;
   final int currentPage;
   final int totalCount;
+  final String? nextPageUrl;
   final String? loadMoreErrorMessage;
   final String? errorMessage;
 
   bool get hasContent => orders.isNotEmpty;
   bool get hasActiveFilters => filters.hasActiveFilters;
-  bool get hasMorePages => orders.length < totalCount;
+  bool get hasMorePages => nextPageUrl != null || orders.length < totalCount;
 
   PurchaseOrdersState copyWith({
     bool? isLoading,
@@ -56,10 +59,12 @@ class PurchaseOrdersState {
     bool? isLoadingSuppliers,
     int? currentPage,
     int? totalCount,
+    String? nextPageUrl,
     String? loadMoreErrorMessage,
     String? errorMessage,
     bool clearError = false,
     bool clearLoadMoreError = false,
+    bool clearNextPageUrl = false,
   }) {
     return PurchaseOrdersState(
       isLoading: isLoading ?? this.isLoading,
@@ -70,6 +75,7 @@ class PurchaseOrdersState {
       isLoadingSuppliers: isLoadingSuppliers ?? this.isLoadingSuppliers,
       currentPage: currentPage ?? this.currentPage,
       totalCount: totalCount ?? this.totalCount,
+      nextPageUrl: clearNextPageUrl ? null : (nextPageUrl ?? this.nextPageUrl),
       loadMoreErrorMessage: clearLoadMoreError
           ? null
           : (loadMoreErrorMessage ?? this.loadMoreErrorMessage),
@@ -84,32 +90,45 @@ class PurchaseOrdersController extends ValueNotifier<PurchaseOrdersState> {
         super(const PurchaseOrdersState.initial());
 
   final PurchaseOrderRepository _repository;
+  int _requestGeneration = 0;
 
   Future<void> load(
     String authToken, {
     PurchaseOrderFilters? filters,
   }) async {
+    final requestGeneration = ++_requestGeneration;
     final effectiveFilters = filters ?? value.filters;
     value = value.copyWith(
       isLoading: true,
+      isLoadingMore: false,
+      currentPage: 0,
+      totalCount: 0,
       clearError: true,
       clearLoadMoreError: true,
+      clearNextPageUrl: true,
     );
     try {
       final page = await _repository.fetchPurchaseOrdersPage(
         authToken: authToken,
         filters: effectiveFilters,
       );
+      if (requestGeneration != _requestGeneration) {
+        return;
+      }
       value = value.copyWith(
         isLoading: false,
         orders: page.orders,
         filters: effectiveFilters,
         currentPage: 1,
         totalCount: page.count,
+        nextPageUrl: page.nextPageUrl,
         clearError: true,
         clearLoadMoreError: true,
       );
     } catch (error) {
+      if (requestGeneration != _requestGeneration) {
+        return;
+      }
       value = value.copyWith(
         isLoading: false,
         errorMessage: isConnectivityIssue(error)
@@ -124,17 +143,26 @@ class PurchaseOrdersController extends ValueNotifier<PurchaseOrdersState> {
       return;
     }
 
+    final requestGeneration = _requestGeneration;
     value = value.copyWith(
       isLoadingMore: true,
       clearLoadMoreError: true,
     );
     try {
       final nextPage = value.currentPage + 1;
-      final page = await _repository.fetchPurchaseOrdersPage(
-        authToken: authToken,
-        filters: value.filters,
-        page: nextPage,
-      );
+      final page = value.nextPageUrl != null
+          ? await _repository.fetchPurchaseOrdersPageByUrl(
+              authToken: authToken,
+              pageUrl: value.nextPageUrl!,
+            )
+          : await _repository.fetchPurchaseOrdersPage(
+              authToken: authToken,
+              filters: value.filters,
+              page: nextPage,
+            );
+      if (requestGeneration != _requestGeneration) {
+        return;
+      }
       value = value.copyWith(
         isLoadingMore: false,
         orders: <PurchaseOrder>[
@@ -143,9 +171,13 @@ class PurchaseOrdersController extends ValueNotifier<PurchaseOrdersState> {
         ],
         currentPage: nextPage,
         totalCount: page.count,
+        nextPageUrl: page.nextPageUrl,
         clearLoadMoreError: true,
       );
     } catch (error) {
+      if (requestGeneration != _requestGeneration) {
+        return;
+      }
       value = value.copyWith(
         isLoadingMore: false,
         loadMoreErrorMessage: isConnectivityIssue(error)
