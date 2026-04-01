@@ -1,24 +1,24 @@
 class PurchaseOrderFilters {
   const PurchaseOrderFilters({
-    this.status,
+    this.statuses = const <String>[],
     this.supplierId,
     this.orderedFrom,
     this.orderedTo,
   });
 
-  final String? status;
+  final List<String> statuses;
   final int? supplierId;
   final DateTime? orderedFrom;
   final DateTime? orderedTo;
 
   bool get hasActiveFilters =>
-      _hasText(status) ||
+      statuses.isNotEmpty ||
       supplierId != null ||
       orderedFrom != null ||
       orderedTo != null;
 
   PurchaseOrderFilters copyWith({
-    String? status,
+    List<String>? statuses,
     int? supplierId,
     DateTime? orderedFrom,
     DateTime? orderedTo,
@@ -28,7 +28,7 @@ class PurchaseOrderFilters {
     bool clearOrderedTo = false,
   }) {
     return PurchaseOrderFilters(
-      status: clearStatus ? null : (status ?? this.status),
+      statuses: clearStatus ? const <String>[] : (statuses ?? this.statuses),
       supplierId: clearSupplier ? null : (supplierId ?? this.supplierId),
       orderedFrom: clearOrderedFrom ? null : (orderedFrom ?? this.orderedFrom),
       orderedTo: clearOrderedTo ? null : (orderedTo ?? this.orderedTo),
@@ -37,11 +37,22 @@ class PurchaseOrderFilters {
 
   Map<String, String> toQueryParameters() {
     return <String, String>{
-      if (_hasText(status)) 'status': status!.trim(),
       if (supplierId != null) 'supplier': '$supplierId',
       if (orderedFrom != null) 'ordered_from': _formatDate(orderedFrom!),
       if (orderedTo != null) 'ordered_to': _formatDate(orderedTo!),
     };
+  }
+
+  Iterable<MapEntry<String, String>> toRepeatedQueryParameters() sync* {
+    for (final status in statuses) {
+      if (_hasText(status)) {
+        yield MapEntry<String, String>('status', status.trim());
+      }
+    }
+    final singleValueParameters = toQueryParameters();
+    for (final entry in singleValueParameters.entries) {
+      yield entry;
+    }
   }
 
   static String _formatDate(DateTime value) {

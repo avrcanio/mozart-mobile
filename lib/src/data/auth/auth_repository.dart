@@ -16,9 +16,9 @@ class AuthRepository {
   final AuthStorage _storage;
   final String? logoutPath;
 
-  Uri get tokenEndpoint => _apiClient.endpoint('/api/token/');
+  Uri get tokenEndpoint => _apiClient.endpoint(path: '/api/token/');
 
-  Uri get meEndpoint => _apiClient.endpoint('/api/me/');
+  Uri get meEndpoint => _apiClient.endpoint(path: '/api/me/');
 
   Future<UserSession> login({
     required String username,

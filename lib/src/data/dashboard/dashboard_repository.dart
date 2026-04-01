@@ -18,20 +18,27 @@ class DashboardRepository {
   }) async {
     final futures = await Future.wait<dynamic>([
       _mailboxRepository.fetchMessagesPage(authToken: authToken),
-      _purchaseOrderRepository.fetchPurchaseOrdersPage(authToken: authToken),
       _purchaseOrderRepository.fetchPurchaseOrdersPage(
         authToken: authToken,
-        filters: const PurchaseOrderFilters(status: 'created'),
+        filters: const PurchaseOrderFilters(
+          statuses: <String>['confirmed'],
+        ),
+      ),
+      _purchaseOrderRepository.fetchPurchaseOrdersPage(
+        authToken: authToken,
+        filters: const PurchaseOrderFilters(
+          statuses: <String>['created', 'sent'],
+        ),
       ),
     ]);
 
     final mailboxPage = futures[0] as MailboxPage;
-    final ordersPage = futures[1] as PurchaseOrderPage;
-    final pendingApprovalPage = futures[2] as PurchaseOrderPage;
+    final confirmedOrdersPage = futures[1] as PurchaseOrderPage;
+    final createdAndSentPage = futures[2] as PurchaseOrderPage;
 
     return DashboardSummary(
-      openPurchaseOrders: ordersPage.count,
-      pendingApprovals: pendingApprovalPage.count,
+      confirmedOrders: confirmedOrdersPage.count,
+      createdAndSentOrders: createdAndSentPage.count,
       totalMessages: mailboxPage.count,
       activeWarehouses: 0,
     );

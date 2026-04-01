@@ -14,41 +14,41 @@ class PurchaseOrderRepository {
 
   final ApiClient _apiClient;
 
-  Uri get listEndpoint => _apiClient.endpoint('/api/purchase-orders/');
+  Uri get listEndpoint => _apiClient.endpoint(path: '/api/purchase-orders/');
 
-  Uri detailEndpoint(int id) => _apiClient.endpoint('/api/purchase-orders/$id/');
+  Uri detailEndpoint(int id) => _apiClient.endpoint(path: '/api/purchase-orders/$id/');
 
-  Uri get suppliersEndpoint => _apiClient.endpoint('/api/suppliers/');
+  Uri get suppliersEndpoint => _apiClient.endpoint(path: '/api/suppliers/');
 
-  Uri get paymentTypesEndpoint => _apiClient.endpoint('/api/payment-types/');
+  Uri get paymentTypesEndpoint => _apiClient.endpoint(path: '/api/payment-types/');
 
-  Uri get warehousesEndpoint => _apiClient.endpoint('/api/warehouses/');
+  Uri get warehousesEndpoint => _apiClient.endpoint(path: '/api/warehouses/');
 
   Uri supplierArticlesEndpoint(int supplierId) =>
-      _apiClient.endpoint('/api/suppliers/$supplierId/artikli/');
+      _apiClient.endpoint(path: '/api/suppliers/$supplierId/artikli/');
 
   Uri patchPriceEndpoint(int itemId) =>
-      _apiClient.endpoint('/api/purchase-order-items/$itemId/price/');
+      _apiClient.endpoint(path: '/api/purchase-order-items/$itemId/price/');
 
   Uri warehouseInputsEndpoint(int orderId) =>
-      _apiClient.endpoint('/api/purchase-orders/$orderId/warehouse-inputs/');
+      _apiClient.endpoint(path: '/api/purchase-orders/$orderId/warehouse-inputs/');
 
   Uri sendEndpoint(int orderId) =>
-      _apiClient.endpoint('/api/purchase-orders/$orderId/send/');
+      _apiClient.endpoint(path: '/api/purchase-orders/$orderId/send/');
 
   Future<PurchaseOrderPage> fetchPurchaseOrdersPage({
     required String authToken,
     PurchaseOrderFilters filters = const PurchaseOrderFilters(),
     int page = 1,
   }) async {
-    final queryParameters = <String, String>{
-      ...filters.toQueryParameters(),
-      if (page > 1) 'page': '$page',
-    };
     final json = await _apiClient.getJson(
       '/api/purchase-orders/',
       authToken: authToken,
-      queryParameters: queryParameters,
+      queryParameters: <String, String>{
+        ...filters.toQueryParameters(),
+        if (page > 1) 'page': '$page',
+      },
+      queryParametersList: filters.toRepeatedQueryParameters(),
     );
     final orders = (json['results'] as List<dynamic>? ?? const <dynamic>[])
         .whereType<Map<String, dynamic>>()

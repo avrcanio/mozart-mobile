@@ -9,9 +9,10 @@ class MailboxRepository {
 
   final ApiClient _apiClient;
 
-  Uri get messagesEndpoint => _apiClient.endpoint('/api/mailbox/messages/');
+  Uri get messagesEndpoint => _apiClient.endpoint(path: '/api/mailbox/messages/');
 
-  Uri detailEndpoint(int id) => _apiClient.endpoint('/api/mailbox/messages/$id/');
+  Uri detailEndpoint(int id) =>
+      _apiClient.endpoint(path: '/api/mailbox/messages/$id/');
 
   Future<MailboxPage> fetchMessagesPage({
     required String authToken,
