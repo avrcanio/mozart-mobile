@@ -27,7 +27,7 @@ class AuthRepository {
     final normalizedUsername = username.trim();
     final normalizedPassword = password.trim();
     if (normalizedUsername.isEmpty || normalizedPassword.isEmpty) {
-      throw const AuthException('Username and password are required.');
+      throw const AuthException('Korisnicko ime i lozinka su obavezni.');
     }
 
     try {

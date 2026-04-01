@@ -39,7 +39,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Mozart Mobile'), findsOneWidget);
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Prijava'), findsOneWidget);
   });
 
   testWidgets('boots into authenticated dashboard with restored session', (
@@ -89,7 +89,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('Mozart Operator'), findsAtLeastNWidgets(1));
-    expect(find.text('Purchase Orders'), findsWidgets);
+    expect(find.text('Narudzbe'), findsWidgets);
     expect(find.text('1'), findsWidgets);
   });
 
@@ -211,9 +211,9 @@ void main() {
     expect(find.text('14'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
     expect(find.text('27'), findsOneWidget);
-    expect(find.text('Messages'), findsOneWidget);
-    expect(find.text('Purchase Orders'), findsWidgets);
-    expect(find.text('Created POs'), findsOneWidget);
+    expect(find.text('Poruke'), findsWidgets);
+    expect(find.text('Narudzbe'), findsWidgets);
+    expect(find.text('Kreirane'), findsWidgets);
     expect(find.text('Open POs'), findsNothing);
     expect(find.text('Approvals'), findsNothing);
     expect(find.text('Warehouses'), findsNothing);
@@ -259,7 +259,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Mailbox'));
+    await tester.tap(_navigationDestinationFinder('Poruke'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('nabava@mozart.hr'), findsOneWidget);
@@ -327,7 +327,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Mailbox'));
+    await tester.tap(_navigationDestinationFinder('Poruke'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Nova ponuda'));
@@ -538,7 +538,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Mailbox'));
+    await tester.tap(_navigationDestinationFinder('Poruke'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('HTML poruka'));
@@ -602,7 +602,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Mailbox'));
+    await tester.tap(_navigationDestinationFinder('Poruke'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Broken detail'));
@@ -678,7 +678,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Mailbox'));
+    await tester.tap(_navigationDestinationFinder('Poruke'));
     await tester.pumpAndSettle();
 
     expect(find.text('Inbox one'), findsOneWidget);
@@ -775,7 +775,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Mailbox'));
+    await tester.tap(_navigationDestinationFinder('Poruke'));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -847,7 +847,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('PO-2048'), findsWidgets);
@@ -934,7 +934,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-2048').first);
@@ -1022,7 +1022,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-2048').first);
@@ -1065,7 +1065,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
@@ -1106,7 +1106,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
@@ -1164,7 +1164,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
@@ -1195,7 +1195,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Prijava'), findsOneWidget);
     expect(await harness.storage.readToken(), isNull);
   });
 
@@ -1257,7 +1257,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Filteri'));
@@ -1360,7 +1360,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Filteri'));
@@ -1498,7 +1498,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Filteri'));
@@ -1619,7 +1619,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('PO-001'), findsOneWidget);
@@ -1727,7 +1727,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Filteri'));
@@ -1800,10 +1800,10 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Logout'));
+    await tester.tap(find.byTooltip('Odjava'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Prijava'), findsOneWidget);
     expect(await harness.storage.readToken(), isNull);
   });
 
@@ -1963,7 +1963,7 @@ void main() {
                     ),
                   );
                 },
-                child: const Text('Open receipt'),
+                child: const Text('Otvori zaprimanje'),
               ),
             ),
           ),
@@ -1971,7 +1971,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Open receipt'));
+    await tester.tap(find.text('Otvori zaprimanje'));
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -1993,7 +1993,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Zaprimanje robe'), findsNothing);
-    expect(find.text('Open receipt'), findsOneWidget);
+    expect(find.text('Otvori zaprimanje'), findsOneWidget);
   });
 
   testWidgets('warns before discarding unsaved price audit changes', (
@@ -2222,7 +2222,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(_navigationDestinationFinder('Narudzbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-SEND').first);
@@ -2372,7 +2372,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(find.text('Narudzbe').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-RECEIPT').first);
@@ -2559,7 +2559,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(find.text('Narudzbe').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-2048').first);
@@ -2704,7 +2704,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Purchase Orders').last);
+    await tester.tap(find.text('Narudzbe').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-2049').first);
@@ -3233,6 +3233,13 @@ class _Harness {
   final Widget app;
   final SessionController controller;
   final AuthStorage storage;
+}
+
+Finder _navigationDestinationFinder(String label) {
+  return find.descendant(
+    of: find.byType(NavigationBar),
+    matching: find.text(label),
+  );
 }
 
 class _FakeResponse {

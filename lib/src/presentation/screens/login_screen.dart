@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'Access purchase orders, messages, and daily operations in one place.',
+                                'Pristupite narudzbama, porukama i dnevnim zadacima na jednom mjestu.',
                                 style: theme.textTheme.bodyLarge,
                               ),
                               const SizedBox(height: 28),
@@ -71,8 +71,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 autocorrect: false,
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
-                                  labelText: 'Username',
-                                  hintText: 'Enter your username',
+                                  labelText: 'Korisnicko ime',
+                                  hintText: 'Unesite korisnicko ime',
                                 ),
                               ),
                               const SizedBox(height: 16),
@@ -80,8 +80,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 controller: _passwordController,
                                 obscureText: true,
                                 decoration: const InputDecoration(
-                                  labelText: 'Password',
-                                  hintText: 'Enter your password',
+                                  labelText: 'Lozinka',
+                                  hintText: 'Unesite lozinku',
                                 ),
                               ),
                               if (widget.state.errorMessage != null) ...[
@@ -112,8 +112,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                     child: Text(
                                       widget.state.isLoading
-                                          ? 'Connecting...'
-                                          : 'Sign in',
+                                          ? 'Povezivanje...'
+                                          : 'Prijava',
                                     ),
                                   ),
                                 ),

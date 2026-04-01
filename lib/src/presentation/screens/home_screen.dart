@@ -223,12 +223,12 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             onPressed: _refreshCurrentTab,
-            tooltip: 'Refresh',
+            tooltip: 'Osvjezi',
             icon: const Icon(Icons.refresh),
           ),
           IconButton(
             onPressed: sessionController.logout,
-            tooltip: 'Logout',
+            tooltip: 'Odjava',
             icon: const Icon(Icons.logout),
           ),
         ],
@@ -243,17 +243,17 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
             selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+            label: 'Pocetna',
           ),
           NavigationDestination(
             icon: Icon(Icons.mail_outline),
             selectedIcon: Icon(Icons.mail),
-            label: 'Mailbox',
+            label: 'Poruke',
           ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
-            label: 'Purchase Orders',
+            label: 'Narudzbe',
           ),
         ],
         onDestinationSelected: (index) {
@@ -361,19 +361,19 @@ class _DashboardTab extends StatelessWidget {
             : 2;
     final tiles = [
       (
-        'Purchase Orders',
+        'Narudzbe',
         '${summary?.openPurchaseOrders ?? 0}',
         Icons.inventory_2,
         const Color(0xFFF3E2D4),
       ),
       (
-        'Created POs',
+        'Kreirane',
         '${summary?.pendingApprovals ?? 0}',
         Icons.gpp_good,
         const Color(0xFFE2ECE0),
       ),
       (
-        'Messages',
+        'Poruke',
         '${summary?.totalMessages ?? 0}',
         Icons.mail_outline,
         const Color(0xFFF6E8D8),
@@ -383,7 +383,7 @@ class _DashboardTab extends StatelessWidget {
     return _PageFrame(
       child: ListView(
         children: [
-          Text('Dashboard', style: theme.textTheme.headlineMedium),
+          Text('Pocetna', style: theme.textTheme.headlineMedium),
           const SizedBox(height: 6),
           Text(
             'Pregled najvaznijih obaveza i stanja za danasnji rad.',
@@ -405,7 +405,7 @@ class _DashboardTab extends StatelessWidget {
           else if (state.errorMessage != null && !state.hasContent)
             _TabStateCard(
               icon: Icons.wifi_off_rounded,
-              title: 'Dashboard nije dostupan',
+              title: 'Pocetna nije dostupna',
               message: state.errorMessage!,
               actionLabel: 'Pokusaj ponovno',
               onAction: onRetry,
@@ -414,7 +414,7 @@ class _DashboardTab extends StatelessWidget {
             _TabStateCard(
               icon: Icons.dashboard_customize_outlined,
               title: 'Nema podataka za prikaz',
-              message: 'Dashboard ce se pojaviti cim stignu novi podaci.',
+              message: 'Pocetna ce se pojaviti cim stignu novi podaci.',
               actionLabel: 'Osvjezi',
               onAction: onRetry,
             )
@@ -576,7 +576,7 @@ class _MailboxTab extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Mailbox', style: theme.textTheme.headlineMedium),
+                Text('Poruke', style: theme.textTheme.headlineMedium),
                 const SizedBox(height: 8),
                 Text(
                   'Pregledajte nove poruke i priloge na jednom mjestu.',
@@ -757,7 +757,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
     final list = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Purchase Orders', style: theme.textTheme.headlineMedium),
+        Text('Narudzbe', style: theme.textTheme.headlineMedium),
         const SizedBox(height: 8),
         Text(
           'Pratite narudzbe, statuse i osnovne detalje isporuke.',
