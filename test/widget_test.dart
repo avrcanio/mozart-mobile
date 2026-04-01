@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -296,6 +297,47 @@ void main() {
     );
 
     await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
+    expect(find.text('Pokusaj ponovno'), findsOneWidget);
+  });
+
+  testWidgets('shows retryable error state when purchase orders time out', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      requestTimeout: const Duration(milliseconds: 10),
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 4,
+          'username': 'root',
+          'email': 'root@mozart.local',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 1,
+            'subject': 'ok',
+            'from_email': 'mail@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T08:45:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': _delayedResponse(
+          const Duration(milliseconds: 50),
+          _jsonListResponse(<Map<String, dynamic>>[]),
+        ),
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Purchase Orders'));
@@ -829,16 +871,37 @@ void main() {
     expect((body['items'] as List).single['id'], 7);
     expect((body['items'] as List).single['price'], '13.00');
   });
+
+  test('maps request timeout to retryable api exception', () async {
+    final client = ApiClient(
+      baseUrl: 'https://example.test',
+      requestTimeout: const Duration(milliseconds: 10),
+      transport: _NeverCompletesTransport(),
+    );
+
+    await expectLater(
+      () => client.getJson('/api/purchase-orders/', authToken: 'saved-token'),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.message,
+          'message',
+          'Zahtjev je istekao. Provjerite vezu i pokusajte ponovno.',
+        ),
+      ),
+    );
+  });
 }
 
 Future<_Harness> _createHarness({
   required Map<String, dynamic> responses,
   String? savedToken,
+  Duration requestTimeout = const Duration(seconds: 15),
 }) async {
   final transport = _FakeTransport(responses);
   final apiClient = ApiClient(
     baseUrl: 'https://example.test',
     transport: transport,
+    requestTimeout: requestTimeout,
   );
   final storage = InMemoryAuthStorage();
   if (savedToken != null) {
@@ -891,6 +954,16 @@ _FakeResponse _jsonListResponse(List<Map<String, dynamic>> json) {
   );
 }
 
+Future<_FakeResponse> Function(ApiRequest) _delayedResponse(
+  Duration delay,
+  _FakeResponse response,
+) {
+  return (_) async {
+    await Future<void>.delayed(delay);
+    return response;
+  };
+}
+
 class _Harness {
   const _Harness({
     required this.app,
@@ -935,6 +1008,8 @@ class _FakeTransport implements ApiTransport {
       response = candidate.removeAt(0);
     } else if (candidate is _FakeResponse Function(ApiRequest)) {
       response = candidate(request);
+    } else if (candidate is Future<_FakeResponse> Function(ApiRequest)) {
+      response = await candidate(request);
     } else {
       throw StateError('Invalid fake response for $key');
     }
@@ -944,5 +1019,13 @@ class _FakeTransport implements ApiTransport {
       statusCode: response.statusCode,
       body: response.body,
     );
+  }
+}
+
+class _NeverCompletesTransport implements ApiTransport {
+  @override
+  Future<ApiResponse> send(ApiRequest request) {
+    final completer = Completer<ApiResponse>();
+    return completer.future;
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,10 +10,12 @@ class ApiClient {
       'MOZART_API_BASE_URL',
       defaultValue: 'https://mozart.sibenik1983.hr',
     ),
+    this.requestTimeout = const Duration(seconds: 15),
     ApiTransport? transport,
   }) : _transport = transport ?? HttpApiTransport();
 
   final String baseUrl;
+  final Duration requestTimeout;
   final ApiTransport _transport;
 
   Future<JsonMap> getJson(
@@ -134,7 +137,15 @@ class ApiClient {
   }
 
   Future<ApiResponse> _send(ApiRequest request) async {
-    final response = await _transport.send(request);
+    late final ApiResponse response;
+    try {
+      response = await _transport.send(request).timeout(requestTimeout);
+    } on TimeoutException {
+      throw ApiException(
+        'Zahtjev je istekao. Provjerite vezu i pokusajte ponovno.',
+        uri: request.uri,
+      );
+    }
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response;
     }
