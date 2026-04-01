@@ -10,9 +10,12 @@ import 'package:mozart_mobile/src/data/dashboard/dashboard_repository.dart';
 import 'package:mozart_mobile/src/data/http/api_client.dart';
 import 'package:mozart_mobile/src/data/mailbox/mailbox_repository.dart';
 import 'package:mozart_mobile/src/data/purchase_orders/purchase_order_repository.dart';
+import 'package:mozart_mobile/src/domain/purchase_order.dart';
+import 'package:mozart_mobile/src/domain/user_session.dart';
 import 'package:mozart_mobile/src/presentation/app_services_scope.dart';
 import 'package:mozart_mobile/src/presentation/app_view.dart';
 import 'package:mozart_mobile/src/presentation/session_scope.dart';
+import 'package:mozart_mobile/src/presentation/screens/purchase_order_form_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -571,6 +574,131 @@ void main() {
     expect(find.text('Posalji narudzbu'), findsNothing);
     expect(find.text('Poslana'), findsWidgets);
   });
+
+  testWidgets(
+    'edits purchase order safely when historical article is missing from supplier lookup',
+    (tester) async {
+      ApiRequest? capturedRequest;
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 88,
+                  'artikl_name': 'Fresh item',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kg',
+                  'price': '11.00',
+                },
+              ],
+            ),
+            'PUT /api/purchase-orders/44/': (ApiRequest request) {
+              capturedRequest = request;
+              return _jsonResponse(<String, dynamic>{
+                'id': 44,
+                'reference': 'PO-EDIT',
+                'supplier': 2,
+                'supplier_name': 'Blue Harbor Supply',
+                'status': 'created',
+                'status_display': 'Kreirana',
+                'payment_type': 5,
+                'payment_type_name': 'Virman',
+                'ordered_at': '2026-04-05T09:30:00Z',
+                'total_gross': '130.00',
+                'items': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 7,
+                    'artikl': 77,
+                    'artikl_name': 'Historical item',
+                    'quantity': '4.0000',
+                    'unit_of_measure': 1,
+                    'unit_name': 'kg',
+                    'price': '13.00',
+                    'received_quantity': '0.0000',
+                    'remaining_quantity': '4.0000',
+                    'base_group': '',
+                  },
+                ],
+              });
+            },
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      const initialOrder = PurchaseOrder(
+        id: 44,
+        reference: 'PO-EDIT',
+        supplierId: 2,
+        status: 'created',
+        statusLabel: 'Kreirana',
+        supplierName: 'Blue Harbor Supply',
+        paymentTypeId: 5,
+        paymentTypeName: 'Virman',
+        totalAmount: 130,
+        currency: 'EUR',
+        orderedAt: null,
+        lines: <PurchaseOrderLine>[
+          PurchaseOrderLine(
+            id: 7,
+            articleId: 77,
+            articleName: 'Historical item',
+            unitOfMeasureId: 1,
+            unitName: 'kg',
+            baseGroup: '',
+            quantity: 4,
+            receivedQuantity: 0,
+            remainingQuantity: 4,
+            unitPrice: 13,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildMozartTheme(),
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+            initialOrder: initialOrder,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Historical item'), findsWidgets);
+      expect(
+        find.textContaining('vise nije u aktivnom katalogu dobavljaca'),
+        findsOneWidget,
+      );
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('po-form-save')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('po-form-save')));
+      await tester.pumpAndSettle();
+
+      final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+      expect((body['items'] as List).single['artikl'], 77);
+      expect((body['items'] as List).single['id'], 7);
+    },
+  );
 
   test('creates purchase order with expected payload mapping', () async {
     ApiRequest? capturedRequest;

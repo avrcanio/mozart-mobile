@@ -284,6 +284,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                       DropdownButtonFormField<int>(
                         key: const Key('po-form-supplier'),
                         initialValue: _selectedSupplierId,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Dobavljac',
                         ),
@@ -291,7 +292,11 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                             .map(
                               (supplier) => DropdownMenuItem<int>(
                                 value: supplier.id,
-                                child: Text(supplier.name),
+                                child: Text(
+                                  supplier.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             )
                             .toList(),
@@ -313,6 +318,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                       DropdownButtonFormField<int>(
                         key: const Key('po-form-payment-type'),
                         initialValue: _selectedPaymentTypeId,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Tip placanja',
                         ),
@@ -320,7 +326,11 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                             .map(
                               (paymentType) => DropdownMenuItem<int>(
                                 value: paymentType.id,
-                                child: Text(paymentType.name),
+                                child: Text(
+                                  paymentType.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             )
                             .toList(),
@@ -418,6 +428,31 @@ class _EditableOrderLineCardState extends State<_EditableOrderLineCard> {
   late TextEditingController _quantityController;
   late TextEditingController _priceController;
 
+  List<SupplierArticleDto> get _selectableArticles {
+    final hasCurrentArticle = widget.articles.any(
+      (article) => article.id == widget.line.articleId,
+    );
+    if (widget.line.articleId <= 0 || hasCurrentArticle) {
+      return widget.articles;
+    }
+    return <SupplierArticleDto>[
+      SupplierArticleDto(
+        id: widget.line.articleId,
+        name: widget.line.articleName.isEmpty
+            ? 'Nepoznati artikl'
+            : '${widget.line.articleName} (vise nije u katalogu)',
+        unitOfMeasureId: widget.line.unitOfMeasureId,
+        unitName: widget.line.unitName,
+        defaultPrice: widget.line.parsedPrice ?? 0,
+      ),
+      ...widget.articles,
+    ];
+  }
+
+  bool get _isHistoricalArticleMissing =>
+      widget.line.articleId > 0 &&
+      !widget.articles.any((article) => article.id == widget.line.articleId);
+
   @override
   void initState() {
     super.initState();
@@ -445,6 +480,8 @@ class _EditableOrderLineCardState extends State<_EditableOrderLineCard> {
 
   @override
   Widget build(BuildContext context) {
+    final selectableArticles = _selectableArticles;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -452,12 +489,17 @@ class _EditableOrderLineCardState extends State<_EditableOrderLineCard> {
           children: [
             DropdownButtonFormField<int>(
               initialValue: widget.line.articleId > 0 ? widget.line.articleId : null,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Artikl'),
-              items: widget.articles
+              items: selectableArticles
                   .map(
                     (article) => DropdownMenuItem<int>(
                       value: article.id,
-                      child: Text(article.name),
+                      child: Text(
+                        article.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   )
                   .toList(),
@@ -465,7 +507,7 @@ class _EditableOrderLineCardState extends State<_EditableOrderLineCard> {
                 if (value == null) {
                   return;
                 }
-                final article = widget.articles.firstWhere(
+                final article = selectableArticles.firstWhere(
                   (candidate) => candidate.id == value,
                 );
                 widget.onChanged(
@@ -482,6 +524,16 @@ class _EditableOrderLineCardState extends State<_EditableOrderLineCard> {
               },
               validator: (value) => value == null ? 'Odaberite artikl.' : null,
             ),
+            if (_isHistoricalArticleMissing) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Ovaj artikl vise nije u aktivnom katalogu dobavljaca. Mozete ga zadrzati ili odabrati zamjenu.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TextFormField(
               key: Key('po-line-${widget.lineIndex}-quantity'),
@@ -547,6 +599,8 @@ class _EditableOrderLine {
   final String unitName;
   final String quantityText;
   final String priceText;
+
+  double? get parsedPrice => double.tryParse(priceText.trim());
 
   bool get isComplete =>
       articleId > 0 &&
