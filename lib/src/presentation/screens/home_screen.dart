@@ -117,6 +117,14 @@ class _HomeScreenState extends State<HomeScreen> {
     await _purchaseOrdersController.load(widget.session.token);
   }
 
+  Future<void> _openPurchaseOrdersWithStatuses(List<String> statuses) async {
+    _setTabIndex(2);
+    await _purchaseOrdersController.applyFilters(
+      widget.session.token,
+      PurchaseOrderFilters(statuses: statuses),
+    );
+  }
+
   Future<void> _refreshDashboard() async {
     await _dashboardController.load(widget.session.token);
   }
@@ -179,7 +187,11 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (context, state, _) => _DashboardTab(
           state: state,
           onRetry: _refreshDashboard,
-          onOpenPurchaseOrders: () => _setTabIndex(2),
+          onOpenConfirmedOrders: () =>
+              _openPurchaseOrdersWithStatuses(const <String>['confirmed']),
+          onOpenCreatedAndSentOrders: () => _openPurchaseOrdersWithStatuses(
+            const <String>['created', 'sent'],
+          ),
           onOpenMailbox: () => _setTabIndex(1),
         ),
       ),
@@ -337,13 +349,15 @@ class _DashboardTab extends StatelessWidget {
   const _DashboardTab({
     required this.state,
     required this.onRetry,
-    required this.onOpenPurchaseOrders,
+    required this.onOpenConfirmedOrders,
+    required this.onOpenCreatedAndSentOrders,
     required this.onOpenMailbox,
   });
 
   final DashboardState state;
   final Future<void> Function() onRetry;
-  final VoidCallback onOpenPurchaseOrders;
+  final VoidCallback onOpenConfirmedOrders;
+  final VoidCallback onOpenCreatedAndSentOrders;
   final VoidCallback onOpenMailbox;
 
   @override
@@ -357,18 +371,18 @@ class _DashboardTab extends StatelessWidget {
             : 2;
     final tiles = [
       (
-        'Narud\u017Ebe',
-        '${summary?.openPurchaseOrders ?? 0}',
+        'Potvrđene',
+        '${summary?.confirmedOrders ?? 0}',
         Icons.inventory_2,
         const Color(0xFFF3E2D4),
-        onOpenPurchaseOrders,
+        onOpenConfirmedOrders,
       ),
       (
-        'Kreirane',
-        '${summary?.pendingApprovals ?? 0}',
+        'Kreirane i poslane',
+        '${summary?.createdAndSentOrders ?? 0}',
         Icons.gpp_good,
         const Color(0xFFE2ECE0),
-        onOpenPurchaseOrders,
+        onOpenCreatedAndSentOrders,
       ),
       (
         'Poruke',
@@ -706,6 +720,20 @@ class _PurchaseOrdersTab extends StatelessWidget {
   final PurchaseOrder? selectedOrderDetail;
   final ValueChanged<int> onSelect;
 
+  static const double _loadMoreTriggerExtent = 480;
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.extentAfter > _loadMoreTriggerExtent) {
+      return false;
+    }
+    if (notification is ScrollUpdateNotification ||
+        notification is OverscrollNotification ||
+        notification is UserScrollNotification) {
+      onLoadMore();
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 900;
@@ -841,15 +869,17 @@ class _PurchaseOrdersTab extends StatelessWidget {
         ],
         if (state.hasContent && state.hasMorePages) ...[
           const SizedBox(height: 4),
-          Center(
-            child: FilledButton.tonal(
-              key: const Key('po-load-more'),
-              onPressed: state.isLoadingMore ? null : onLoadMore,
-              child: Text(
-                state.isLoadingMore ? 'U\u010Ditavanje...' : 'U\u010Ditaj jo\u0161',
+          if (state.isLoadingMore)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 8),
           Text(
             'Prikazano ${state.orders.length} od ${state.totalCount} narud\u017Ebi.',
@@ -869,7 +899,12 @@ class _PurchaseOrdersTab extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: SingleChildScrollView(child: list)),
+                      Expanded(
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: _handleScrollNotification,
+                          child: SingleChildScrollView(child: list),
+                        ),
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: selectedOrder == null
@@ -891,7 +926,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
                                     onOrderChanged: onOrderChanged,
                                   ),
                                 ),
-                              ),
+                              )
                       ),
                     ],
                   ),
@@ -900,9 +935,12 @@ class _PurchaseOrdersTab extends StatelessWidget {
             )
           : RefreshIndicator(
               onRefresh: onRetry,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [list],
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _handleScrollNotification,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [list],
+                ),
               ),
             ),
     );
@@ -915,10 +953,10 @@ List<Widget> _buildFilterChips(
 ) {
   final chips = <Widget>[];
 
-  if ((filters.status ?? '').trim().isNotEmpty) {
+  for (final status in filters.statuses) {
     chips.add(
       Chip(
-        label: Text('Status: ${_statusLabel(filters.status!)}'),
+        label: Text('Status: ${_statusLabel(status)}'),
       ),
     );
   }
@@ -990,7 +1028,7 @@ class _PurchaseOrderFilterSheet extends StatefulWidget {
 }
 
 class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
-  late String? _status;
+  late List<String> _statuses;
   late int? _supplierId;
   late DateTime? _orderedFrom;
   late DateTime? _orderedTo;
@@ -1000,7 +1038,7 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
   @override
   void initState() {
     super.initState();
-    _status = widget.initialFilters.status;
+    _statuses = [...widget.initialFilters.statuses];
     _supplierId = widget.initialFilters.supplierId;
     _orderedFrom = widget.initialFilters.orderedFrom;
     _orderedTo = widget.initialFilters.orderedTo;
@@ -1069,29 +1107,47 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<String?>(
+              Container(
                 key: const Key('po-filter-status'),
-                initialValue: _status,
-                decoration: const InputDecoration(
-                  labelText: 'Status',
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                  ),
                 ),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('Svi statusi'),
-                  ),
-                  ..._purchaseOrderStatusOptions.map(
-                    (option) => DropdownMenuItem<String?>(
-                      value: option.value,
-                      child: Text(option.label),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Text('Statusi'),
                     ),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _status = value;
-                  });
-                },
+                    ..._purchaseOrderStatusOptions.map(
+                      (option) => CheckboxListTile(
+                        key: Key('po-filter-status-${option.value}'),
+                        value: _statuses.contains(option.value),
+                        title: Text(option.label),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        onChanged: (selected) {
+                          setState(() {
+                            if (selected ?? false) {
+                              if (!_statuses.contains(option.value)) {
+                                _statuses = [..._statuses, option.value];
+                              }
+                            } else {
+                              _statuses = _statuses
+                                  .where((status) => status != option.value)
+                                  .toList();
+                            }
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<int?>(
@@ -1180,7 +1236,7 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
                     onPressed: () {
                       Navigator.of(context).pop(
                         PurchaseOrderFilters(
-                          status: _emptyToNull(_status),
+                          statuses: _statuses,
                           supplierId: _supplierId,
                           orderedFrom: _orderedFrom,
                           orderedTo: _orderedTo,
@@ -1197,14 +1253,6 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
       ),
     );
   }
-}
-
-String? _emptyToNull(String? value) {
-  if (value == null) {
-    return null;
-  }
-  final trimmed = value.trim();
-  return trimmed.isEmpty ? null : trimmed;
 }
 
 String _formatDisplayDate(DateTime? value) {

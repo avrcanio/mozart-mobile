@@ -22,11 +22,16 @@ class ApiClient {
     String path, {
     String? authToken,
     Map<String, String>? queryParameters,
+    Iterable<MapEntry<String, String>>? queryParametersList,
   }) async {
     final response = await _send(
       ApiRequest(
         method: 'GET',
-        uri: _endpoint(path, queryParameters: queryParameters),
+        uri: _endpoint(
+          path,
+          queryParameters: queryParameters,
+          queryParametersList: queryParametersList,
+        ),
         headers: _headers(authToken: authToken),
       ),
     );
@@ -37,11 +42,16 @@ class ApiClient {
     String path, {
     String? authToken,
     Map<String, String>? queryParameters,
+    Iterable<MapEntry<String, String>>? queryParametersList,
   }) async {
     final response = await _send(
       ApiRequest(
         method: 'GET',
-        uri: _endpoint(path, queryParameters: queryParameters),
+        uri: _endpoint(
+          path,
+          queryParameters: queryParameters,
+          queryParametersList: queryParametersList,
+        ),
         headers: _headers(authToken: authToken),
       ),
     );
@@ -108,10 +118,21 @@ class ApiClient {
     return _decodeMap(response);
   }
 
-  Uri endpoint(String path, {Map<String, String>? queryParameters}) =>
-      _endpoint(path, queryParameters: queryParameters);
+  Uri endpoint({
+    required String path,
+    Map<String, String>? queryParameters,
+    Iterable<MapEntry<String, String>>? queryParametersList,
+  }) => _endpoint(
+        path,
+        queryParameters: queryParameters,
+        queryParametersList: queryParametersList,
+      );
 
-  Uri _endpoint(String path, {Map<String, String>? queryParameters}) {
+  Uri _endpoint(
+    String path, {
+    Map<String, String>? queryParameters,
+    Iterable<MapEntry<String, String>>? queryParametersList,
+  }) {
     if (baseUrl.isEmpty) {
       throw const ApiException(
         'Missing API base URL.',
@@ -121,10 +142,20 @@ class ApiClient {
     final normalizedBase = baseUrl.replaceAll(RegExp(r'/$'), '');
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     final uri = Uri.parse('$normalizedBase$normalizedPath');
-    if (queryParameters == null || queryParameters.isEmpty) {
+    final allEntries = <MapEntry<String, String>>[
+      if (queryParametersList != null) ...queryParametersList,
+      if (queryParameters != null) ...queryParameters.entries,
+    ];
+    if (allEntries.isEmpty) {
       return uri;
     }
-    return uri.replace(queryParameters: queryParameters);
+    final query = allEntries
+        .map(
+          (entry) =>
+              '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value)}',
+        )
+        .join('&');
+    return uri.replace(query: query);
   }
 
   Map<String, String> _headers({String? authToken}) {

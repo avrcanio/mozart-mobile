@@ -48,7 +48,7 @@ void main() {
   ) async {
     final harness = await _createHarness(
       savedToken: 'saved-token',
-      responses: <String, _FakeResponse>{
+      responses: <String, dynamic>{
         'GET /api/me/': _jsonResponse(<String, dynamic>{
           'id': 7,
           'username': 'root',
@@ -196,7 +196,23 @@ void main() {
             },
           ],
         ),
-        'GET /api/purchase-orders/?status=created': _jsonPaginatedResponse(
+        'GET /api/purchase-orders/?status=confirmed': _jsonPaginatedResponse(
+          count: 14,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 15,
+              'reference': 'PO-15',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'confirmed',
+              'status_display': 'Potvrđena',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/?status=created&status=sent': _jsonPaginatedResponse(
           count: 2,
           results: <Map<String, dynamic>>[
             <String, dynamic>{
@@ -224,15 +240,18 @@ void main() {
 
     await tester.tap(_navigationDestinationFinder('Početna'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Narudžbe').first);
+    await tester.tap(find.text('Potvrđene').first);
     await tester.pumpAndSettle();
     expect(find.text('Narudžbe'), findsWidgets);
+    expect(find.text('Status: Potvrđena'), findsOneWidget);
 
     await tester.tap(_navigationDestinationFinder('Početna'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Kreirane').first);
+    await tester.tap(find.text('Kreirane i poslane').first);
     await tester.pumpAndSettle();
     expect(find.text('Narudžbe'), findsWidgets);
+    expect(find.text('Status: Kreirana'), findsOneWidget);
+    expect(find.text('Status: Poslana'), findsOneWidget);
   });
 
   testWidgets('pull to refresh reloads each home tab independently', (
@@ -287,17 +306,17 @@ void main() {
             ],
           );
         },
-        'GET /api/purchase-orders/?status=created': (ApiRequest request) {
+        'GET /api/purchase-orders/?status=confirmed': (ApiRequest request) {
           dashboardCreatedCount += 1;
           return _jsonPaginatedResponse(
             count: dashboardCreatedCount,
             results: <Map<String, dynamic>>[
               <String, dynamic>{
                 'id': 19,
-                'reference': 'PO-CREATED',
+                'reference': 'PO-CONFIRMED',
                 'supplier_name': 'Adriatic Trade',
-                'status': 'created',
-                'status_display': 'Kreirana',
+                'status': 'confirmed',
+                'status_display': 'Potvrđena',
                 'payment_type_name': 'Virman',
                 'ordered_at': '2026-04-01T09:30:00Z',
                 'total_gross': '145.50',
@@ -306,6 +325,22 @@ void main() {
             ],
           );
         },
+        'GET /api/purchase-orders/?status=created&status=sent': _jsonPaginatedResponse(
+          count: 4,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 25,
+              'reference': 'PO-CREATED',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
       },
     );
 
@@ -322,7 +357,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    expect(find.text('2'), findsWidgets);
+    expect(find.text('2'), findsOneWidget);
     await tester.drag(find.byType(Scrollable).first, const Offset(0, 300));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -392,7 +427,23 @@ void main() {
             },
           ],
         ),
-        'GET /api/purchase-orders/?status=created': _jsonPaginatedResponse(
+        'GET /api/purchase-orders/?status=confirmed': _jsonPaginatedResponse(
+          count: 14,
+          results: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 19,
+              'reference': 'PO-19',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'confirmed',
+              'status_display': 'Potvrđena',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ],
+        ),
+        'GET /api/purchase-orders/?status=created&status=sent': _jsonPaginatedResponse(
           count: 3,
           results: <Map<String, dynamic>>[
             <String, dynamic>{
@@ -414,12 +465,12 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    expect(find.text('14'), findsOneWidget);
+    expect(find.text('14'), findsWidgets);
     expect(find.text('3'), findsOneWidget);
     expect(find.text('27'), findsOneWidget);
     expect(find.text('Poruke'), findsWidgets);
-    expect(find.text('Narudžbe'), findsWidgets);
-    expect(find.text('Kreirane'), findsWidgets);
+    expect(find.text('Potvrđene'), findsOneWidget);
+    expect(find.text('Kreirane i poslane'), findsOneWidget);
     expect(find.text('Open POs'), findsNothing);
     expect(find.text('Approvals'), findsNothing);
     expect(find.text('Warehouses'), findsNothing);
@@ -428,7 +479,7 @@ void main() {
   testWidgets('renders mailbox list from mapped backend data', (tester) async {
     final harness = await _createHarness(
       savedToken: 'saved-token',
-      responses: <String, _FakeResponse>{
+      responses: <String, dynamic>{
         'GET /api/me/': _jsonResponse(<String, dynamic>{
           'id': 3,
           'username': 'root',
@@ -1651,7 +1702,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
         ]),
         'GET /api/purchase-orders/': (ApiRequest request) async {
           purchaseOrdersCallCount += 1;
-          if (purchaseOrdersCallCount <= 2) {
+          if (purchaseOrdersCallCount <= 1) {
             throw SocketException('No route to host');
           }
           return _jsonListResponse(<Map<String, dynamic>>[
@@ -1668,7 +1719,10 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             },
           ]);
         },
-        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+        'GET /api/purchase-orders/?status=confirmed': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/purchase-orders/?status=created&status=sent': _jsonListResponse(
           <Map<String, dynamic>>[],
         ),
       },
@@ -1717,7 +1771,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
   ) async {
     final harness = await _createHarness(
       savedToken: 'saved-token',
-      responses: <String, _FakeResponse>{
+      responses: <String, dynamic>{
         'GET /api/me/': _jsonResponse(<String, dynamic>{
           'id': 4,
           'username': 'root',
@@ -1733,25 +1787,17 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'attachments_count': 0,
           },
         ]),
-        'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
-          <String, dynamic>{
-            'id': 1,
-            'reference': 'PO-BASE',
-            'supplier_name': 'Blue Harbor Supply',
-            'status': 'created',
-            'status_display': 'Kreirana',
-            'payment_type_name': 'Virman',
-            'ordered_at': '2026-04-01T09:30:00Z',
-            'total_gross': '99.99',
-            'items': <Map<String, dynamic>>[],
-          },
-        ]),
-        'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
-          <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
-          <String, dynamic>{'id': 3, 'name': 'Coffee Logistics'},
-        ]),
-        'GET /api/purchase-orders/?status=sent&supplier=2&ordered_from=2026-04-02&ordered_to=2026-04-03':
-            _jsonListResponse(<Map<String, dynamic>>[
+        'GET /api/purchase-orders/': (ApiRequest request) {
+          final statuses = request.uri.queryParametersAll['status'] ?? const <String>[];
+          final supplier = request.uri.queryParameters['supplier'];
+          final orderedFrom = request.uri.queryParameters['ordered_from'];
+          final orderedTo = request.uri.queryParameters['ordered_to'];
+          if (statuses.length == 1 &&
+              statuses.single == 'sent' &&
+              supplier == '2' &&
+              orderedFrom == '2026-04-02' &&
+              orderedTo == '2026-04-03') {
+            return _jsonListResponse(<Map<String, dynamic>>[
               <String, dynamic>{
                 'id': 2048,
                 'reference': 'PO-FILTERED',
@@ -1763,7 +1809,26 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
                 'total_gross': '18420.50',
                 'items': <Map<String, dynamic>>[],
               },
-            ]),
+            ]);
+          }
+          return _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 1,
+              'reference': 'PO-BASE',
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '99.99',
+              'items': <Map<String, dynamic>>[],
+            },
+          ]);
+        },
+        'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+          <String, dynamic>{'id': 3, 'name': 'Coffee Logistics'},
+        ]),
       },
     );
 
@@ -1776,9 +1841,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.tap(find.text('Filteri'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('po-filter-status')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Poslana').last);
+    await tester.tap(find.byKey(const Key('po-filter-status-sent')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('po-filter-supplier')));
@@ -1786,6 +1849,11 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.tap(find.text('Blue Harbor Supply').last);
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('po-filter-ordered-from')),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.byKey(const Key('po-filter-ordered-from')));
     await tester.pumpAndSettle();
     expect(find.byType(DatePickerDialog), findsOneWidget);
@@ -1799,6 +1867,11 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     );
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('po-filter-ordered-to')),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.byKey(const Key('po-filter-ordered-to')));
     await tester.pumpAndSettle();
     expect(find.byType(DatePickerDialog), findsOneWidget);
@@ -1815,6 +1888,11 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(find.text('02.04.2026.'), findsOneWidget);
     expect(find.text('03.04.2026.'), findsOneWidget);
 
+    await tester.scrollUntilVisible(
+      find.text('Primijeni'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('Primijeni'));
     await tester.pump();
     await tester.pumpAndSettle();
@@ -1865,7 +1943,10 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'items': <Map<String, dynamic>>[],
           },
         ]),
-        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+        'GET /api/purchase-orders/?status=confirmed': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/purchase-orders/?status=created&status=sent': _jsonListResponse(
           <Map<String, dynamic>>[
             <String, dynamic>{
               'id': 1,
@@ -1899,11 +1980,14 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.tap(find.text('Filteri'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('po-filter-status')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Poslana').last);
+    await tester.tap(find.byKey(const Key('po-filter-status-sent')));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Primijeni'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('Primijeni'));
     await tester.pump();
     await tester.pumpAndSettle();
@@ -1946,7 +2030,10 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'items': <Map<String, dynamic>>[],
           },
         ]),
-        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+        'GET /api/purchase-orders/?status=confirmed': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/purchase-orders/?status=created&status=sent': _jsonListResponse(
           <Map<String, dynamic>>[
             <String, dynamic>{
               'id': 1,
@@ -2037,11 +2124,14 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.tap(find.text('Filteri'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('po-filter-status')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Poslana').last);
+    await tester.tap(find.byKey(const Key('po-filter-status-sent')));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Primijeni'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('Primijeni'));
     await tester.pump();
     await tester.pumpAndSettle();
@@ -2161,15 +2251,14 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(find.textContaining('PO-001'), findsOneWidget);
     expect(find.textContaining('PO-002'), findsOneWidget);
     expect(find.textContaining('PO-003'), findsNothing);
-    expect(find.text('Učitaj još'), findsOneWidget);
     expect(find.text('Prikazano 2 od 3 narudžbi.'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('po-load-more')));
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -900));
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.textContaining('PO-003'), findsOneWidget);
-    expect(find.text('Učitaj još'), findsNothing);
+    expect(find.text('Prikazano 3 od 3 narudžbi.'), findsNothing);
   });
 
   testWidgets('keeps active filters applied across purchase order pagination', (
@@ -2269,11 +2358,14 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.tap(find.text('Filteri'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('po-filter-status')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Poslana').last);
+    await tester.tap(find.byKey(const Key('po-filter-status-sent')));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Primijeni'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('Primijeni'));
     await tester.pump();
     await tester.pumpAndSettle();
@@ -2283,12 +2375,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(find.textContaining('PO-SENT-3'), findsNothing);
     expect(find.text('Status: Poslana'), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('po-load-more')),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.byKey(const Key('po-load-more')));
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -900));
     await tester.pump();
     await tester.pumpAndSettle();
 
@@ -2983,7 +3070,10 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'items': <Map<String, dynamic>>[],
           },
         ]),
-        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+        'GET /api/purchase-orders/?status=confirmed': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/purchase-orders/?status=created&status=sent': _jsonListResponse(
           <Map<String, dynamic>>[],
         ),
         'GET /api/purchase-orders/350/': _jsonResponse(<String, dynamic>{
