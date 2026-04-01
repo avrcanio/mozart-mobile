@@ -1,10 +1,12 @@
 import '../../domain/purchase_order.dart';
 import '../../domain/purchase_order_filters.dart';
+import '../../domain/warehouse_option.dart';
 import '../http/api_client.dart';
 import 'models/payment_type_dto.dart';
 import 'models/purchase_order_dto.dart';
 import 'models/supplier_article_dto.dart';
 import 'models/supplier_dto.dart';
+import 'models/warehouse_dto.dart';
 
 class PurchaseOrderRepository {
   PurchaseOrderRepository({required ApiClient apiClient})
@@ -19,6 +21,8 @@ class PurchaseOrderRepository {
   Uri get suppliersEndpoint => _apiClient.endpoint('/api/suppliers/');
 
   Uri get paymentTypesEndpoint => _apiClient.endpoint('/api/payment-types/');
+
+  Uri get warehousesEndpoint => _apiClient.endpoint('/api/warehouses/');
 
   Uri supplierArticlesEndpoint(int supplierId) =>
       _apiClient.endpoint('/api/suppliers/$supplierId/artikli/');
@@ -98,6 +102,20 @@ class PurchaseOrderRepository {
     return jsonList
         .whereType<Map<String, dynamic>>()
         .map(PaymentTypeDto.fromJson)
+        .toList();
+  }
+
+  Future<List<WarehouseOption>> fetchWarehouses({
+    required String authToken,
+  }) async {
+    final jsonList = await _apiClient.getJsonList(
+      '/api/warehouses/',
+      authToken: authToken,
+    );
+    return jsonList
+        .whereType<Map<String, dynamic>>()
+        .map(WarehouseDto.fromJson)
+        .map((dto) => dto.toDomain())
         .toList();
   }
 

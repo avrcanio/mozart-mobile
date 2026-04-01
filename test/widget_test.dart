@@ -1284,6 +1284,175 @@ void main() {
     expect(find.text('Poslana'), findsWidgets);
   });
 
+  testWidgets('creates warehouse receipt and refreshes purchase order detail', (
+    tester,
+  ) async {
+    ApiRequest? capturedReceiptRequest;
+    final harness = await _createHarness(
+      savedToken: 'saved-token',
+      responses: <String, dynamic>{
+        'GET /api/me/': _jsonResponse(<String, dynamic>{
+          'id': 7,
+          'username': 'root',
+          'email': 'root@mozart.local',
+          'first_name': 'Mozart',
+          'last_name': 'Operator',
+        }),
+        'GET /api/mailbox/messages/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'id': 101,
+            'subject': 'Daily digest',
+            'from_email': 'office@mozart.local',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-01T10:15:00Z',
+            'attachments_count': 0,
+          },
+        ]),
+        'GET /api/purchase-orders/': <_FakeResponse>[
+          _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 34,
+              'reference': 'PO-RECEIPT',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'confirmed',
+              'status_display': 'Potvrdena',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ]),
+          _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 34,
+              'reference': 'PO-RECEIPT',
+              'supplier_name': 'Adriatic Trade',
+              'status': 'received_all',
+              'status_display': 'Sve stavke s narudzbe su zaprimljene',
+              'payment_type_name': 'Virman',
+              'ordered_at': '2026-04-01T09:30:00Z',
+              'total_gross': '145.50',
+              'items': <Map<String, dynamic>>[],
+            },
+          ]),
+        ],
+        'GET /api/purchase-orders/?status=created': _jsonListResponse(
+          <Map<String, dynamic>>[],
+        ),
+        'GET /api/purchase-orders/34/': <_FakeResponse>[
+          _jsonResponse(<String, dynamic>{
+            'id': 34,
+            'reference': 'PO-RECEIPT',
+            'supplier': 2,
+            'supplier_name': 'Adriatic Trade',
+            'status': 'confirmed',
+            'status_display': 'Potvrdena',
+            'payment_type': 5,
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'currency': 'EUR',
+            'total_net': '120.00',
+            'total_gross': '145.50',
+            'items': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 8,
+                'artikl': 77,
+                'artikl_name': 'Coffee beans',
+                'quantity': '10.0000',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.00',
+                'received_quantity': '4.0000',
+                'remaining_quantity': '6.0000',
+                'base_group': '',
+              },
+            ],
+          }),
+          _jsonResponse(<String, dynamic>{
+            'id': 34,
+            'reference': 'PO-RECEIPT',
+            'supplier': 2,
+            'supplier_name': 'Adriatic Trade',
+            'status': 'received_all',
+            'status_display': 'Sve stavke s narudzbe su zaprimljene',
+            'payment_type': 5,
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T09:30:00Z',
+            'currency': 'EUR',
+            'total_net': '120.00',
+            'total_gross': '145.50',
+            'items': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 8,
+                'artikl': 77,
+                'artikl_name': 'Coffee beans',
+                'quantity': '10.0000',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.00',
+                'received_quantity': '10.0000',
+                'remaining_quantity': '0.0000',
+                'base_group': '',
+              },
+            ],
+          }),
+        ],
+        'GET /api/warehouses/': _jsonListResponse(<Map<String, dynamic>>[
+          <String, dynamic>{'id': 3, 'name': 'Glavno skladiste'},
+        ]),
+        'POST /api/purchase-orders/34/warehouse-inputs/': (ApiRequest request) {
+          capturedReceiptRequest = request;
+          return _jsonResponse(<String, dynamic>{
+            'warehouse_input': <String, dynamic>{'id': 55},
+            'purchase_order': <String, dynamic>{'id': 34},
+          });
+        },
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Purchase Orders').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('PO-RECEIPT').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Zaprimanje robe'), findsOneWidget);
+
+    await tester.tap(find.text('Zaprimanje robe'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Zaprimanje za PO-RECEIPT'), findsOneWidget);
+    expect(find.text('Glavno skladiste'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('po-receipt-line-0-quantity')),
+      '6',
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('po-receipt-submit')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('po-receipt-submit')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    final body = jsonDecode(capturedReceiptRequest!.body!) as Map<String, dynamic>;
+    expect(body['warehouse_id'], 3);
+    expect((body['items'] as List).single['purchase_order_item_id'], 8);
+    expect((body['items'] as List).single['received_quantity'], '6.0');
+
+    expect(find.text('Zaprimanje robe je uspjesno spremljeno.'), findsOneWidget);
+    expect(find.text('Sve stavke s narudzbe su zaprimljene'), findsWidgets);
+    expect(find.text('Zaprimanje robe'), findsNothing);
+  });
+
   testWidgets(
     'edits purchase order safely when historical article is missing from supplier lookup',
     (tester) async {

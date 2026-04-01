@@ -6,6 +6,7 @@ import '../../domain/purchase_order.dart';
 import '../../domain/user_session.dart';
 import '../purchase_order_detail_controller.dart';
 import 'purchase_order_form_screen.dart';
+import 'purchase_order_receipt_screen.dart';
 
 class PurchaseOrderDetailScreen extends StatelessWidget {
   const PurchaseOrderDetailScreen({
@@ -118,6 +119,30 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
     }
   }
 
+  Future<void> _openReceipt(PurchaseOrder order) async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => PurchaseOrderReceiptScreen(
+          order: order,
+          session: widget.session,
+          repository: widget.repository,
+        ),
+      ),
+    );
+    if (created == true) {
+      if (widget.onOrderChanged != null) {
+        await widget.onOrderChanged!();
+      }
+      _load();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Zaprimanje robe je uspjesno spremljeno.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<PurchaseOrderDetailState>(
@@ -139,6 +164,7 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
               onRetry: _load,
               onSend: _send,
               onEdit: _openEdit,
+              onReceive: _openReceipt,
             ),
           ),
         ],
@@ -153,12 +179,14 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
     required this.onRetry,
     required this.onSend,
     required this.onEdit,
+    required this.onReceive,
   });
 
   final PurchaseOrderDetailState state;
   final VoidCallback onRetry;
   final Future<void> Function() onSend;
   final Future<void> Function(PurchaseOrder order) onEdit;
+  final Future<void> Function(PurchaseOrder order) onReceive;
 
   @override
   Widget build(BuildContext context) {
@@ -243,7 +271,9 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
         if (order.canSend)
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
-            child: Row(
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
                 FilledButton.icon(
                   onPressed: state.isSending ? null : onSend,
@@ -262,19 +292,34 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Uredi'),
                 ),
+                if (order.remainingQuantity > 0)
+                  OutlinedButton.icon(
+                    onPressed: () => onReceive(order),
+                    icon: const Icon(Icons.warehouse_outlined),
+                    label: const Text('Zaprimanje robe'),
+                  ),
               ],
             ),
           ),
         if (!order.canSend)
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => onEdit(order),
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Uredi'),
-              ),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => onEdit(order),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Uredi'),
+                ),
+                if (order.remainingQuantity > 0)
+                  OutlinedButton.icon(
+                    onPressed: () => onReceive(order),
+                    icon: const Icon(Icons.warehouse_outlined),
+                    label: const Text('Zaprimanje robe'),
+                  ),
+              ],
             ),
           ),
         Card(
