@@ -27,7 +27,7 @@ class PurchaseOrderDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detalji narudzbe'),
+        title: const Text('Detalji narud\u017Ebe'),
       ),
       body: SafeArea(
         child: Padding(
@@ -139,7 +139,7 @@ class _PurchaseOrderDetailPaneState extends State<PurchaseOrderDetailPane> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Zaprimanje robe je uspjesno spremljeno.')),
+        const SnackBar(content: Text('Zaprimanje robe je uspje\u0161no spremljeno.')),
       );
     }
   }
@@ -242,7 +242,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
         icon: Icons.wifi_off_rounded,
         title: 'Detalji nisu dostupni',
         message: state.errorMessage!,
-        actionLabel: 'Pokusaj ponovno',
+        actionLabel: 'Pokušaj ponovno',
         onAction: onRetry,
       );
     }
@@ -315,7 +315,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.send),
-                  label: Text(state.isSending ? 'Slanje...' : 'Posalji narudzbu'),
+                  label: Text(state.isSending ? 'Slanje...' : 'Pošalji narudžbu'),
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
@@ -359,17 +359,17 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Narudzba ${order.reference}',
+                Text('Narud\u017Eba ${order.reference}',
                     style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 8),
                 Text(
-                  'Pregled osnovnih podataka i statusa narudzbe.',
+                  'Pregled osnovnih podataka i statusa narud\u017Ebe.',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 16),
-                _DetailRow(label: 'Sifra', value: '#${order.id}'),
+                _DetailRow(label: '\u0160ifra', value: '#${order.id}'),
                 _DetailRow(label: 'Referenca', value: order.reference),
-                _DetailRow(label: 'Dobavljac', value: order.supplierName),
+                _DetailRow(label: 'Dobavlja\u010D', value: order.supplierName),
                 _DetailRow(
                   label: 'Status',
                   value: order.statusLabel,
@@ -404,7 +404,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Kratki pregled kako je narudzba dosla do trenutnog stanja.',
+                  'Kratki pregled kako je narud\u017Eba do\u0161la do trenutnog stanja.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 14),
@@ -486,7 +486,7 @@ class _PurchaseOrderDetailBody extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 if (order.lines.isEmpty)
-                  const Text('Narudzba trenutno nema stavki.')
+                  const Text('Narud\u017Eba trenutno nema stavki.')
                 else
                   ...order.lines.map(
                     (line) => Padding(

@@ -3,12 +3,12 @@ import 'package:intl/intl.dart';
 
 import '../../data/dashboard/dashboard_repository.dart';
 import '../../data/mailbox/mailbox_repository.dart';
+import '../../data/purchase_orders/models/supplier_dto.dart';
 import '../../data/purchase_orders/purchase_order_repository.dart';
 import '../../domain/mail_message.dart';
 import '../../domain/purchase_order.dart';
 import '../../domain/purchase_order_filters.dart';
 import '../../domain/user_session.dart';
-import '../../data/purchase_orders/models/supplier_dto.dart';
 import '../dashboard_controller.dart';
 import '../mailbox_controller.dart';
 import '../purchase_orders_controller.dart';
@@ -80,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         return 'Poruke';
       case 2:
-        return 'Narudzbe';
+        return 'Narud\u017Ebe';
       case 0:
       default:
         return 'Pocetna';
@@ -282,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
-            label: 'Narudzbe',
+            label: 'Narud\u017Ebe',
           ),
         ],
         onDestinationSelected: (index) {
@@ -357,7 +357,7 @@ class _DashboardTab extends StatelessWidget {
             : 2;
     final tiles = [
       (
-        'Narudzbe',
+        'Narud\u017Ebe',
         '${summary?.openPurchaseOrders ?? 0}',
         Icons.inventory_2,
         const Color(0xFFF3E2D4),
@@ -385,57 +385,56 @@ class _DashboardTab extends StatelessWidget {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
-          if (state.errorMessage != null) _ErrorBanner(message: state.errorMessage!),
-          if (state.isLoading)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: LinearProgressIndicator(),
-            ),
-          if (state.isLoading && !state.hasContent)
-            const _TabStateCard(
-              icon: Icons.hourglass_top_rounded,
-              title: 'Ucitavanje dashboarda',
-              message: 'Pripremamo najvaznije podatke za danasnji rad.',
-            )
-          else if (state.errorMessage != null && !state.hasContent)
-            _TabStateCard(
-              icon: Icons.wifi_off_rounded,
-              title: 'Pocetna nije dostupna',
-              message: state.errorMessage!,
-              actionLabel: 'Pokusaj ponovno',
-              onAction: () => onRetry(),
-            )
-          else if (!state.hasContent)
-            _TabStateCard(
-              icon: Icons.dashboard_customize_outlined,
-              title: 'Nema podataka za prikaz',
-              message: 'Pocetna ce se pojaviti cim stignu novi podaci.',
-              actionLabel: 'Osvjezi',
-              onAction: () => onRetry(),
-            )
-          else ...[
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: tiles.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio: screenWidth < 420 ? 1.18 : 1.32,
+            if (state.errorMessage != null) _ErrorBanner(message: state.errorMessage!),
+            if (state.isLoading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: LinearProgressIndicator(),
               ),
-              itemBuilder: (context, index) {
-                final tile = tiles[index];
-                return _DashboardMetricCard(
-                  label: tile.$1,
-                  value: tile.$2,
-                  icon: tile.$3,
-                  tone: tile.$4,
-                  onTap: tile.$5,
-                );
-              },
-            ),
-          ],
+            if (state.isLoading && !state.hasContent)
+              const _TabStateCard(
+                icon: Icons.hourglass_top_rounded,
+                title: 'U\u010Ditavanje dashboarda',
+                message: 'Pripremamo najva\u017Enije podatke za dana\u0161nji rad.',
+              )
+            else if (state.errorMessage != null && !state.hasContent)
+              _TabStateCard(
+                icon: Icons.wifi_off_rounded,
+                title: 'Po\u010Detna nije dostupna',
+                message: state.errorMessage!,
+                actionLabel: 'Poku\u0161aj ponovno',
+                onAction: () => onRetry(),
+              )
+            else if (!state.hasContent)
+              _TabStateCard(
+                icon: Icons.dashboard_customize_outlined,
+                title: 'Nema podataka za prikaz',
+                message: 'Po\u010Detna \u0107e se pojaviti \u010Dim stignu novi podaci.',
+                actionLabel: 'Osvje\u017Ei',
+                onAction: () => onRetry(),
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: tiles.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: screenWidth < 420 ? 1.18 : 1.32,
+                ),
+                itemBuilder: (context, index) {
+                  final tile = tiles[index];
+                  return _DashboardMetricCard(
+                    label: tile.$1,
+                    value: tile.$2,
+                    icon: tile.$3,
+                    tone: tile.$4,
+                    onTap: tile.$5,
+                  );
+                },
+              ),
           ],
         ),
       ),
@@ -524,121 +523,120 @@ class _MailboxTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final dateTimeFormat = DateFormat('dd.MM.yyyy. HH:mm', 'hr_HR');
+    final sections = _buildMailboxSections(state.messages);
+    final children = <Widget>[
+      if (state.errorMessage != null && state.hasContent)
+        _ErrorBanner(message: state.errorMessage!),
+      if (state.isLoading && state.hasContent)
+        const Padding(
+          padding: EdgeInsets.only(bottom: 16),
+          child: LinearProgressIndicator(),
+        ),
+    ];
+
+    if (state.isLoading && !state.hasContent) {
+      children.add(
+        const _TabStateCard(
+          icon: Icons.mail_outline,
+          title: 'U\u010Ditavanje poruka',
+          message: 'Dohva\u0107amo najnovije poruke i priloge.',
+        ),
+      );
+    } else if (state.errorMessage != null && !state.hasContent) {
+      children.add(
+        _TabStateCard(
+          icon: Icons.mark_email_unread_outlined,
+          title: 'Poruke nisu dostupne',
+          message: state.errorMessage!,
+          actionLabel: 'Poku\u0161aj ponovno',
+          onAction: () => onRetry(),
+        ),
+      );
+    } else if (!state.hasContent) {
+      children.add(
+        _TabStateCard(
+          icon: Icons.inbox_outlined,
+          title: 'Nema poruka',
+          message: 'Trenutno nema novih poruka u sandu\u010Di\u0107u.',
+          actionLabel: 'Osvje\u017Ei',
+          onAction: () => onRetry(),
+        ),
+      );
+    } else {
+      for (final section in sections) {
+        children.add(_SectionHeader(label: section.label));
+        for (final message in section.messages) {
+          children.add(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Card(
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(18),
+                  title: Text(message.subject),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      _buildMailboxSubtitle(message, dateTimeFormat: dateTimeFormat),
+                    ),
+                  ),
+                  trailing: message.hasAttachments
+                      ? _MailboxAttachmentCount(count: message.attachmentCount)
+                      : const SizedBox.shrink(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => MailboxDetailScreen(
+                          messageId: message.id,
+                          session: session,
+                          repository: repository,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        }
+      }
+
+      if (state.loadMoreErrorMessage != null) {
+        children.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _ErrorBanner(message: state.loadMoreErrorMessage!),
+          ),
+        );
+      }
+      if (state.hasMorePages) {
+        children.add(
+          Center(
+            child: FilledButton.tonal(
+              key: const Key('mailbox-load-more'),
+              onPressed: state.isLoadingMore ? null : onLoadMore,
+              child: Text(
+                state.isLoadingMore ? 'U\u010Ditavanje...' : 'U\u010Ditaj jo\u0161',
+              ),
+            ),
+          ),
+        );
+        children.add(const SizedBox(height: 8));
+        children.add(
+          Text(
+            'Prikazano ${state.messages.length} od ${state.totalCount} poruka.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        );
+      }
+    }
 
     return _PageFrame(
       child: RefreshIndicator(
         onRefresh: onRetry,
-        child: ListView.separated(
+        child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          itemCount: state.messages.isEmpty
-            ? 2
-            : state.messages.length + 1 + (state.hasMorePages ? 1 : 0),
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Poruke', style: theme.textTheme.headlineMedium),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Pregledajte nove poruke i priloge na jednom mjestu.',
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  if (state.errorMessage != null && state.hasContent)
-                    _ErrorBanner(message: state.errorMessage!),
-                  if (state.isLoading && state.hasContent)
-                    const LinearProgressIndicator(),
-                  if (state.isLoading && state.hasContent) const SizedBox(height: 16),
-                ],
-              );
-            }
-
-          if (index == 1 && state.isLoading && !state.hasContent) {
-            return const _TabStateCard(
-              icon: Icons.mail_outline,
-              title: 'Ucitavanje poruka',
-              message: 'Dohvacamo najnovije poruke i priloge.',
-            );
-          }
-
-          if (index == 1 && state.errorMessage != null && !state.hasContent) {
-            return _TabStateCard(
-              icon: Icons.mark_email_unread_outlined,
-              title: 'Poruke nisu dostupne',
-              message: state.errorMessage!,
-              actionLabel: 'Pokusaj ponovno',
-              onAction: () => onRetry(),
-            );
-          }
-
-          if (index == 1 && !state.hasContent) {
-            return _TabStateCard(
-              icon: Icons.inbox_outlined,
-              title: 'Nema poruka',
-              message: 'Trenutno nema novih poruka u sanducicu.',
-              actionLabel: 'Osvjezi',
-              onAction: () => onRetry(),
-            );
-          }
-
-          final footerIndex = state.messages.length + 1;
-          if (state.hasMorePages && index == footerIndex) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                if (state.loadMoreErrorMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _ErrorBanner(message: state.loadMoreErrorMessage!),
-                  ),
-                FilledButton.tonal(
-                  key: const Key('mailbox-load-more'),
-                  onPressed: state.isLoadingMore ? null : onLoadMore,
-                  child: Text(
-                    state.isLoadingMore ? 'Ucitavanje...' : 'Ucitaj jos',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Prikazano ${state.messages.length} od ${state.totalCount} poruka.',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            );
-          }
-
-          final message = state.messages[index - 1];
-          return Card(
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(18),
-              title: Text(message.subject),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  _buildMailboxSubtitle(message, dateTimeFormat: dateTimeFormat),
-                ),
-              ),
-              trailing: message.hasAttachments
-                  ? _MailboxAttachmentCount(count: message.attachmentCount)
-                  : const SizedBox.shrink(),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (context) => MailboxDetailScreen(
-                      messageId: message.id,
-                      session: session,
-                      repository: repository,
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
-          },
+          children: children,
         ),
       ),
     );
@@ -710,7 +708,6 @@ class _PurchaseOrdersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isWide = MediaQuery.of(context).size.width >= 900;
     final currencyFormat = NumberFormat.currency(
       locale: 'hr_HR',
@@ -719,17 +716,11 @@ class _PurchaseOrdersTab extends StatelessWidget {
     );
     final dateFormat = DateFormat('dd.MM.yyyy.', 'hr_HR');
     final selectedOrder = selectedOrderDetail;
+    final sections = _buildPurchaseOrderSections(state.orders);
 
     final list = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Narudzbe', style: theme.textTheme.headlineMedium),
-        const SizedBox(height: 8),
-        Text(
-          'Pratite narudzbe, statuse i osnovne detalje isporuke.',
-          style: theme.textTheme.bodyLarge,
-        ),
-        const SizedBox(height: 16),
         Row(
           children: [
             OutlinedButton.icon(
@@ -786,61 +777,68 @@ class _PurchaseOrdersTab extends StatelessWidget {
         if (state.isLoading && !state.hasContent)
           const _TabStateCard(
             icon: Icons.receipt_long_outlined,
-            title: 'Ucitavanje narudzbi',
-            message: 'Pripremamo pregled aktivnih narudzbi.',
+            title: 'U\u010Ditavanje narud\u017Ebi',
+            message: 'Pripremamo pregled aktivnih narud\u017Ebi.',
           )
         else if (state.errorMessage != null && !state.hasContent)
           _TabStateCard(
             icon: Icons.receipt_long_outlined,
-            title: 'Narudzbe nisu dostupne',
+            title: 'Narud\u017Ebe nisu dostupne',
             message: state.errorMessage!,
-            actionLabel: 'Pokusaj ponovno',
+            actionLabel: 'Poku\u0161aj ponovno',
             onAction: () => onRetry(),
           )
         else if (!state.hasContent)
           _TabStateCard(
             icon: Icons.playlist_add_check_circle_outlined,
-            title: 'Nema aktivnih narudzbi',
-            message: 'Kad stignu nove narudzbe, ovdje ce biti prikazane.',
-            actionLabel: 'Osvjezi',
+            title: 'Nema aktivnih narud\u017Ebi',
+            message: 'Kad stignu nove narud\u017Ebe, ovdje \u0107e biti prikazane.',
+            actionLabel: 'Osvje\u017Ei',
             onAction: () => onRetry(),
           )
         else
-          ...state.orders.map(
-          (order) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Card(
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(18),
-                title: Text('${order.reference} | ${order.supplierName}'),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_buildOrderListSubtitle(
-                    order,
-                    currencyFormat: currencyFormat,
-                    dateFormat: dateFormat,
-                  )),
-                ),
-                selected: selectedOrderId == order.id,
-                onTap: () {
-                  onSelect(order.id);
-                  if (!isWide) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (context) => PurchaseOrderDetailScreen(
-                          orderId: order.id,
-                          session: session,
-                          repository: repository,
-                          onOrderChanged: onOrderChanged,
+          ...sections.expand(
+            (section) => <Widget>[
+              _SectionHeader(label: section.label),
+              ...section.orders.map(
+                (order) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Card(
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(18),
+                      title: Text('${order.reference} | ${order.supplierName}'),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _buildOrderListSubtitle(
+                            order,
+                            currencyFormat: currencyFormat,
+                            dateFormat: dateFormat,
+                          ),
                         ),
                       ),
-                    );
-                  }
-                },
+                      selected: selectedOrderId == order.id,
+                      onTap: () {
+                        onSelect(order.id);
+                        if (!isWide) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) => PurchaseOrderDetailScreen(
+                                orderId: order.id,
+                                session: session,
+                                repository: repository,
+                                onOrderChanged: onOrderChanged,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ),
         if (state.loadMoreErrorMessage != null) ...[
           const SizedBox(height: 8),
           _ErrorBanner(message: state.loadMoreErrorMessage!),
@@ -852,14 +850,14 @@ class _PurchaseOrdersTab extends StatelessWidget {
               key: const Key('po-load-more'),
               onPressed: state.isLoadingMore ? null : onLoadMore,
               child: Text(
-                state.isLoadingMore ? 'Ucitavanje...' : 'Ucitaj jos',
+                state.isLoadingMore ? 'U\u010Ditavanje...' : 'U\u010Ditaj jo\u0161',
               ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Prikazano ${state.orders.length} od ${state.totalCount} narudzbi.',
-            style: theme.textTheme.bodySmall,
+            'Prikazano ${state.orders.length} od ${state.totalCount} narud\u017Ebi.',
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ],
@@ -883,7 +881,7 @@ class _PurchaseOrdersTab extends StatelessWidget {
                                 child: Padding(
                                   padding: EdgeInsets.all(24),
                                   child: Text(
-                                    'Odaberite narudzbu za pregled detalja.',
+                                    'Odaberite narud\u017Ebu za pregled detalja.',
                                   ),
                                 ),
                               )
@@ -939,7 +937,7 @@ List<Widget> _buildFilterChips(
     }
     chips.add(
       Chip(
-        label: Text('Dobavljac: ${supplierName ?? '#${filters.supplierId}'}'),
+        label: Text('Dobavlja\u010D: ${supplierName ?? '#${filters.supplierId}'}'),
       ),
     );
   }
@@ -966,8 +964,8 @@ List<Widget> _buildFilterChips(
 const List<({String value, String label})> _purchaseOrderStatusOptions = [
   (value: 'created', label: 'Kreirana'),
   (value: 'sent', label: 'Poslana'),
-  (value: 'confirmed', label: 'Potvrdena'),
-  (value: 'received', label: 'Djelomicno zaprimljena'),
+  (value: 'confirmed', label: 'Potvr\u0111ena'),
+  (value: 'received', label: 'Djelomi\u010Dno zaprimljena'),
   (value: 'received_all', label: 'Sve zaprimljeno'),
   (value: 'canceled', label: 'Otkazana'),
 ];
@@ -998,6 +996,8 @@ class _PurchaseOrderFilterSheet extends StatefulWidget {
 class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
   late String? _status;
   late int? _supplierId;
+  late DateTime? _orderedFrom;
+  late DateTime? _orderedTo;
   late final TextEditingController _orderedFromController;
   late final TextEditingController _orderedToController;
 
@@ -1006,11 +1006,13 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
     super.initState();
     _status = widget.initialFilters.status;
     _supplierId = widget.initialFilters.supplierId;
+    _orderedFrom = widget.initialFilters.orderedFrom;
+    _orderedTo = widget.initialFilters.orderedTo;
     _orderedFromController = TextEditingController(
-      text: _formatInputDate(widget.initialFilters.orderedFrom),
+      text: _formatDisplayDate(_orderedFrom),
     );
     _orderedToController = TextEditingController(
-      text: _formatInputDate(widget.initialFilters.orderedTo),
+      text: _formatDisplayDate(_orderedTo),
     );
   }
 
@@ -1019,6 +1021,39 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
     _orderedFromController.dispose();
     _orderedToController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickOrderedFrom() async {
+    final picked = await _pickDate(initialDate: _orderedFrom ?? _orderedTo);
+    if (picked == null) {
+      return;
+    }
+    setState(() {
+      _orderedFrom = picked;
+      _orderedFromController.text = _formatDisplayDate(picked);
+    });
+  }
+
+  Future<void> _pickOrderedTo() async {
+    final picked = await _pickDate(initialDate: _orderedTo ?? _orderedFrom);
+    if (picked == null) {
+      return;
+    }
+    setState(() {
+      _orderedTo = picked;
+      _orderedToController.text = _formatDisplayDate(picked);
+    });
+  }
+
+  Future<DateTime?> _pickDate({DateTime? initialDate}) {
+    final now = DateTime.now();
+    return showDatePicker(
+      context: context,
+      locale: const Locale('hr', 'HR'),
+      initialDate: initialDate ?? now,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
   }
 
   @override
@@ -1034,7 +1069,7 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Filteri narudzbi',
+                'Filteri narud\u017Ebi',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 16),
@@ -1067,12 +1102,12 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
                 key: const Key('po-filter-supplier'),
                 initialValue: _supplierId,
                 decoration: const InputDecoration(
-                  labelText: 'Dobavljac',
+                  labelText: 'Dobavlja\u010D',
                 ),
                 items: [
                   const DropdownMenuItem<int?>(
                     value: null,
-                    child: Text('Svi dobavljaci'),
+                    child: Text('Svi dobavlja\u010Di'),
                   ),
                   ...widget.suppliers.map(
                     (supplier) => DropdownMenuItem<int?>(
@@ -1091,20 +1126,50 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
               TextField(
                 key: const Key('po-filter-ordered-from'),
                 controller: _orderedFromController,
+                readOnly: true,
                 decoration: const InputDecoration(
-                  labelText: 'Naruceno od',
-                  hintText: 'YYYY-MM-DD',
+                  labelText: 'Naru\u010Deno od',
+                  suffixIcon: Icon(Icons.calendar_today),
                 ),
+                onTap: _pickOrderedFrom,
               ),
+              if (_orderedFrom != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _orderedFrom = null;
+                        _orderedFromController.clear();
+                      });
+                    },
+                    child: const Text('O\u010Disti datum od'),
+                  ),
+                ),
               const SizedBox(height: 14),
               TextField(
                 key: const Key('po-filter-ordered-to'),
                 controller: _orderedToController,
+                readOnly: true,
                 decoration: const InputDecoration(
-                  labelText: 'Naruceno do',
-                  hintText: 'YYYY-MM-DD',
+                  labelText: 'Naru\u010Deno do',
+                  suffixIcon: Icon(Icons.calendar_today),
                 ),
+                onTap: _pickOrderedTo,
               ),
+              if (_orderedTo != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _orderedTo = null;
+                        _orderedToController.clear();
+                      });
+                    },
+                    child: const Text('O\u010Disti datum do'),
+                  ),
+                ),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -1121,8 +1186,8 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
                         PurchaseOrderFilters(
                           status: _emptyToNull(_status),
                           supplierId: _supplierId,
-                          orderedFrom: _parseInputDate(_orderedFromController.text),
-                          orderedTo: _parseInputDate(_orderedToController.text),
+                          orderedFrom: _orderedFrom,
+                          orderedTo: _orderedTo,
                         ),
                       );
                     },
@@ -1146,22 +1211,11 @@ String? _emptyToNull(String? value) {
   return trimmed.isEmpty ? null : trimmed;
 }
 
-DateTime? _parseInputDate(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) {
-    return null;
-  }
-  return DateTime.tryParse(trimmed);
-}
-
-String _formatInputDate(DateTime? value) {
+String _formatDisplayDate(DateTime? value) {
   if (value == null) {
     return '';
   }
-  final normalized = value.toLocal();
-  final month = normalized.month.toString().padLeft(2, '0');
-  final day = normalized.day.toString().padLeft(2, '0');
-  return '${normalized.year}-$month-$day';
+  return DateFormat('dd.MM.yyyy.', 'hr_HR').format(value.toLocal());
 }
 
 class _TabStateCard extends StatelessWidget {
@@ -1221,6 +1275,25 @@ class _TabStateCard extends StatelessWidget {
   }
 }
 
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, top: 4),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
 String _buildOrderListSubtitle(
   PurchaseOrder order, {
   required NumberFormat currencyFormat,
@@ -1244,4 +1317,152 @@ String _formatDate(DateTime? value, DateFormat formatter) {
     return 'Bez datuma';
   }
   return formatter.format(value.toLocal());
+}
+
+class _MailboxSection {
+  const _MailboxSection({
+    required this.label,
+    required this.messages,
+  });
+
+  final String label;
+  final List<MailMessage> messages;
+}
+
+class _PurchaseOrderSection {
+  const _PurchaseOrderSection({
+    required this.label,
+    required this.orders,
+  });
+
+  final String label;
+  final List<PurchaseOrder> orders;
+}
+
+List<_MailboxSection> _buildMailboxSections(List<MailMessage> messages) {
+  final sorted = [...messages]
+    ..sort((a, b) {
+      final aSentAt = a.sentAt;
+      final bSentAt = b.sentAt;
+      if (aSentAt == null && bSentAt == null) {
+        return a.subject.compareTo(b.subject);
+      }
+      if (aSentAt == null) {
+        return 1;
+      }
+      if (bSentAt == null) {
+        return -1;
+      }
+      return bSentAt.compareTo(aSentAt);
+    });
+
+  final formatter = DateFormat('dd.MM.yyyy.', 'hr_HR');
+  final sections = <_MailboxSection>[];
+  DateTime? currentDay;
+  List<MailMessage> currentMessages = <MailMessage>[];
+  String? currentLabel;
+
+  void flush() {
+    if (currentLabel == null || currentMessages.isEmpty) {
+      return;
+    }
+    sections.add(_MailboxSection(label: currentLabel, messages: currentMessages));
+    currentMessages = <MailMessage>[];
+  }
+
+  for (final message in sorted) {
+    final sentAt = message.sentAt?.toLocal();
+    final day = sentAt == null ? null : DateTime(sentAt.year, sentAt.month, sentAt.day);
+    final label = day == null ? 'Bez datuma' : formatter.format(day);
+    final sameGroup = currentLabel == label &&
+        ((day == null && currentDay == null) || day == currentDay);
+    if (!sameGroup) {
+      flush();
+      currentDay = day;
+      currentLabel = label;
+    }
+    currentMessages.add(message);
+  }
+  flush();
+  return sections;
+}
+
+List<_PurchaseOrderSection> _buildPurchaseOrderSections(List<PurchaseOrder> orders) {
+  final sorted = [...orders]
+    ..sort((a, b) {
+      final aOrderedAt = a.orderedAt?.toLocal();
+      final bOrderedAt = b.orderedAt?.toLocal();
+      if (aOrderedAt == null && bOrderedAt == null) {
+        final supplierCompare = a.supplierName.compareTo(b.supplierName);
+        if (supplierCompare != 0) {
+          return supplierCompare;
+        }
+        final referenceCompare = a.reference.compareTo(b.reference);
+        if (referenceCompare != 0) {
+          return referenceCompare;
+        }
+        return a.id.compareTo(b.id);
+      }
+      if (aOrderedAt == null) {
+        return 1;
+      }
+      if (bOrderedAt == null) {
+        return -1;
+      }
+
+      final aDay = DateTime(aOrderedAt.year, aOrderedAt.month, aOrderedAt.day);
+      final bDay = DateTime(bOrderedAt.year, bOrderedAt.month, bOrderedAt.day);
+      final dayCompare = bDay.compareTo(aDay);
+      if (dayCompare != 0) {
+        return dayCompare;
+      }
+
+      final supplierCompare = a.supplierName.compareTo(b.supplierName);
+      if (supplierCompare != 0) {
+        return supplierCompare;
+      }
+
+      final timeCompare = bOrderedAt.compareTo(aOrderedAt);
+      if (timeCompare != 0) {
+        return timeCompare;
+      }
+
+      final referenceCompare = a.reference.compareTo(b.reference);
+      if (referenceCompare != 0) {
+        return referenceCompare;
+      }
+      return a.id.compareTo(b.id);
+    });
+
+  final formatter = DateFormat('dd.MM.yyyy.', 'hr_HR');
+  final sections = <_PurchaseOrderSection>[];
+  DateTime? currentDay;
+  List<PurchaseOrder> currentOrders = <PurchaseOrder>[];
+  String? currentLabel;
+
+  void flush() {
+    if (currentLabel == null || currentOrders.isEmpty) {
+      return;
+    }
+    sections.add(_PurchaseOrderSection(label: currentLabel, orders: currentOrders));
+    currentOrders = <PurchaseOrder>[];
+  }
+
+  for (final order in sorted) {
+    final orderedAt = order.orderedAt?.toLocal();
+    final day = orderedAt == null
+        ? null
+        : DateTime(orderedAt.year, orderedAt.month, orderedAt.day);
+    final label = day == null ? 'Bez datuma' : formatter.format(day);
+    final sameGroup = currentLabel == label &&
+        ((day == null && currentDay == null) || day == currentDay);
+    if (!sameGroup) {
+      flush();
+      currentDay = day;
+      currentLabel = label;
+    }
+    currentOrders.add(order);
+  }
+  flush();
+  return sections;
 }

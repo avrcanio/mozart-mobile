@@ -107,7 +107,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage =
-            'Podaci za narudzbu trenutno nisu dostupni. Pokusajte ponovno.';
+            'Podaci za narud\u017Ebu trenutno nisu dostupni. Poku\u0161ajte ponovno.';
       });
     }
   }
@@ -137,7 +137,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage =
-            'Artikli za odabranog dobavljaca trenutno nisu dostupni.';
+            'Artikli za odabranog dobavlja\u010Da trenutno nisu dostupni.';
       });
     }
   }
@@ -173,19 +173,19 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     }
     if (_selectedSupplierId == null || _selectedPaymentTypeId == null) {
       setState(() {
-        _errorMessage = 'Odaberite dobavljaca i tip placanja.';
+        _errorMessage = 'Odaberite dobavlja\u010Da i tip pla\u0107anja.';
       });
       return;
     }
     if (_orderedAt == null) {
       setState(() {
-        _errorMessage = 'Odaberite datum narudzbe.';
+        _errorMessage = 'Odaberite datum narud\u017Ebe.';
       });
       return;
     }
     if (_lines.isEmpty) {
       setState(() {
-        _errorMessage = 'Dodajte barem jednu stavku narudzbe.';
+        _errorMessage = 'Dodajte barem jednu stavku narud\u017Ebe.';
       });
       return;
     }
@@ -193,7 +193,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       if (!line.isComplete) {
         setState(() {
           _errorMessage =
-              'Svaka stavka mora imati artikl, kolicinu i jedinicu mjere.';
+              'Svaka stavka mora imati artikl, koli\u010Dinu i jedinicu mjere.';
         });
         return;
       }
@@ -246,7 +246,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
       }
       setState(() {
         _isSubmitting = false;
-        _errorMessage = 'Spremanje narudzbe nije uspjelo. Pokusajte ponovno.';
+        _errorMessage = 'Spremanje narud\u017Ebe nije uspjelo. Poku\u0161ajte ponovno.';
       });
       return;
     }
@@ -278,7 +278,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.isEditing ? 'Uredi narudzbu' : 'Nova narudzba';
+    final title = widget.isEditing ? 'Uredi narud\u017Ebu' : 'Nova narud\u017Eba';
 
     return PopScope(
       canPop: _isSubmitting || !_hasUnsavedChanges,
@@ -325,7 +325,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                         initialValue: _selectedSupplierId,
                         isExpanded: true,
                         decoration: const InputDecoration(
-                          labelText: 'Dobavljac',
+                          labelText: 'Dobavlja\u010D',
                         ),
                         items: _suppliers
                             .map(
@@ -351,7 +351,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                                 await _loadArticlesForSupplier(value);
                               },
                         validator: (value) =>
-                            value == null ? 'Odaberite dobavljaca.' : null,
+                            value == null ? 'Odaberite dobavlja\u010Da.' : null,
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<int>(
@@ -359,7 +359,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                         initialValue: _selectedPaymentTypeId,
                         isExpanded: true,
                         decoration: const InputDecoration(
-                          labelText: 'Tip placanja',
+                          labelText: 'Tip pla\u0107anja',
                         ),
                         items: _paymentTypes
                             .map(
@@ -381,7 +381,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                                 });
                               },
                         validator: (value) =>
-                            value == null ? 'Odaberite tip placanja.' : null,
+                            value == null ? 'Odaberite tip pla\u0107anja.' : null,
                       ),
                       const SizedBox(height: 14),
                       TextFormField(
@@ -389,7 +389,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                         controller: _dateController,
                         readOnly: true,
                         decoration: const InputDecoration(
-                          labelText: 'Datum narudzbe',
+                          labelText: 'Datum narud\u017Ebe',
                           suffixIcon: Icon(Icons.calendar_today),
                         ),
                         onTap: _isSubmitting ? null : _pickDate,
@@ -403,7 +403,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                       ),
                       const SizedBox(height: 12),
                       if (_lines.isEmpty)
-                        const Text('Dodajte stavke nakon odabira dobavljaca.')
+                        const Text('Dodajte stavke nakon odabira dobavlja\u010Da.')
                       else
                         ..._lines.asMap().entries.map(
                               (entry) => Padding(
@@ -431,7 +431,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                         key: const Key('po-form-save'),
                         onPressed: _isSubmitting ? null : _submit,
                         child: Text(
-                          _isSubmitting ? 'Spremanje...' : 'Spremi narudzbu',
+                          _isSubmitting ? 'Spremanje...' : 'Spremi narud\u017Ebu',
                         ),
                       ),
                       ],

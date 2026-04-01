@@ -88,7 +88,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
       setState(() {
         _isLoading = false;
         _errorMessage =
-            'Skladista trenutno nisu dostupna. Pokusajte ponovno.';
+            'Skladišta trenutno nisu dostupna. Pokušajte ponovno.';
       });
     }
   }
@@ -174,7 +174,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
       }
       setState(() {
         _isSubmitting = false;
-        _errorMessage = 'Zaprimanje robe nije uspjelo. Pokusajte ponovno.';
+        _errorMessage = 'Zaprimanje robe nije uspjelo. Pokušajte ponovno.';
       });
     }
   }
@@ -319,7 +319,7 @@ class _PurchaseOrderReceiptScreenState extends State<PurchaseOrderReceiptScreen>
                       ),
                       const SizedBox(height: 12),
                       if (_lines.isEmpty)
-                        const Text('Narudzba nema stavki za zaprimanje.')
+                        const Text('Narudžba nema stavki za zaprimanje.')
                       else
                         ..._lines.asMap().entries.map(
                               (entry) => Padding(

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mozart_mobile/src/core/theme/app_theme.dart';
@@ -91,7 +92,7 @@ void main() {
     expect(find.text('Pocetna'), findsWidgets);
     expect(find.byKey(const Key('home-avatar-initials')), findsOneWidget);
     expect(find.text('MO'), findsOneWidget);
-    expect(find.text('Narudzbe'), findsWidgets);
+    expect(find.text('Narudžbe'), findsWidgets);
     expect(find.text('1'), findsWidgets);
   });
 
@@ -223,15 +224,15 @@ void main() {
 
     await tester.tap(_navigationDestinationFinder('Pocetna'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Narudzbe').first);
+    await tester.tap(find.text('Narudžbe').first);
     await tester.pumpAndSettle();
-    expect(find.text('Narudzbe'), findsWidgets);
+    expect(find.text('Narudžbe'), findsWidgets);
 
     await tester.tap(_navigationDestinationFinder('Pocetna'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Kreirane').first);
     await tester.pumpAndSettle();
-    expect(find.text('Narudzbe'), findsWidgets);
+    expect(find.text('Narudžbe'), findsWidgets);
   });
 
   testWidgets('pull to refresh reloads each home tab independently', (
@@ -338,7 +339,7 @@ void main() {
     final refreshedMailboxSubject = visibleTextStartingWith('Mail batch ');
     expect(refreshedMailboxSubject, isNot(initialMailboxSubject));
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
     final initialOrderReference = visibleTextStartingWith('PO-');
     await tester.drag(find.byType(Scrollable).first, const Offset(0, 300));
@@ -417,7 +418,7 @@ void main() {
     expect(find.text('3'), findsOneWidget);
     expect(find.text('27'), findsOneWidget);
     expect(find.text('Poruke'), findsWidgets);
-    expect(find.text('Narudzbe'), findsWidgets);
+    expect(find.text('Narudžbe'), findsWidgets);
     expect(find.text('Kreirane'), findsWidgets);
     expect(find.text('Open POs'), findsNothing);
     expect(find.text('Approvals'), findsNothing);
@@ -444,6 +445,21 @@ void main() {
             'sent_at': '2026-04-01T08:45:00Z',
             'attachments_count': 2,
           },
+          <String, dynamic>{
+            'id': 502,
+            'subject': 'Kasnija poruka',
+            'from_email': 'office@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'sent_at': '2026-04-02T10:15:00Z',
+            'attachments_count': 0,
+          },
+          <String, dynamic>{
+            'id': 503,
+            'subject': 'Poruka bez datuma',
+            'from_email': 'warehouse@mozart.hr',
+            'to_emails': 'root@mozart.local',
+            'attachments_count': 0,
+          },
         ]),
         'GET /api/purchase-orders/': _jsonListResponse(<Map<String, dynamic>>[
           <String, dynamic>{
@@ -467,8 +483,16 @@ void main() {
     await tester.tap(_navigationDestinationFinder('Poruke'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Pregledajte nove poruke i priloge na jednom mjestu.'), findsNothing);
+    expect(find.text('02.04.2026.'), findsOneWidget);
+    expect(find.text('01.04.2026.'), findsWidgets);
+    expect(find.text('Bez datuma'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Kasnija poruka')).dy,
+      lessThan(tester.getTopLeft(find.textContaining('nabava@mozart.hr')).dy),
+    );
     expect(find.textContaining('nabava@mozart.hr'), findsOneWidget);
-    expect(find.textContaining('01.04.2026.'), findsOneWidget);
+    expect(find.text('01.04.2026.'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
   });
 
@@ -589,8 +613,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildMozartTheme(),
+      _testMaterialApp(
         home: MailboxDetailScreen(
           messageId: 700,
           session: session,
@@ -660,8 +683,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildMozartTheme(),
+      _testMaterialApp(
         home: MailboxDetailScreen(
           messageId: 701,
           session: session,
@@ -1000,7 +1022,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpAndSettle();
 
     expect(find.text('Detalji poruke nisu dostupni'), findsOneWidget);
-    expect(find.text('Pokusaj ponovno'), findsOneWidget);
+    expect(find.text('Pokušaj ponovno'), findsOneWidget);
   });
 
   testWidgets('loads additional mailbox pages on demand', (tester) async {
@@ -1073,7 +1095,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(find.text('Inbox one'), findsOneWidget);
     expect(find.text('Inbox two'), findsOneWidget);
     expect(find.text('Inbox three'), findsNothing);
-    expect(find.text('Ucitaj jos'), findsOneWidget);
+    expect(find.text('Učitaj još'), findsOneWidget);
     expect(find.text('Prikazano 2 od 3 poruka.'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('mailbox-load-more')));
@@ -1081,7 +1103,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpAndSettle();
 
     expect(find.text('Inbox three'), findsOneWidget);
-    expect(find.text('Ucitaj jos'), findsNothing);
+    expect(find.text('Učitaj još'), findsNothing);
   });
 
   testWidgets('preserves mailbox detail navigation after loading more pages', (
@@ -1229,6 +1251,28 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
               },
             ],
           },
+          <String, dynamic>{
+            'id': 2049,
+            'reference': 'PO-2049',
+            'supplier_name': 'Alpha Market',
+            'status': 'approved',
+            'status_display': 'Approved',
+            'payment_type_name': 'Karticno',
+            'ordered_at': '2026-04-02T08:30:00Z',
+            'total_gross': '150.00',
+            'items': <Map<String, dynamic>>[],
+          },
+          <String, dynamic>{
+            'id': 2050,
+            'reference': 'PO-2050',
+            'supplier_name': 'Fructus d.o.o.',
+            'status': 'approved',
+            'status_display': 'Approved',
+            'payment_type_name': 'Virman',
+            'ordered_at': '2026-04-01T11:30:00Z',
+            'total_gross': '95.10',
+            'items': <Map<String, dynamic>>[],
+          },
         ]),
       },
     );
@@ -1236,9 +1280,20 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Pratite narudžbe, statuse i osnovne detalje isporuke.'), findsNothing);
+    expect(find.text('02.04.2026.'), findsOneWidget);
+    expect(find.text('01.04.2026.'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.textContaining('PO-2049')).dy,
+      lessThan(tester.getTopLeft(find.textContaining('PO-2048')).dy),
+    );
+    expect(
+      tester.getTopLeft(find.textContaining('PO-2048')).dy,
+      lessThan(tester.getTopLeft(find.textContaining('PO-2050')).dy),
+    );
     expect(find.textContaining('PO-2048'), findsWidgets);
     expect(find.textContaining('Blue Harbor Supply'), findsWidgets);
     expect(find.textContaining('18.420,50'), findsWidgets);
@@ -1323,7 +1378,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-2048').first);
@@ -1331,8 +1386,8 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
 
-    expect(find.text('Detalji narudzbe'), findsOneWidget);
-    expect(find.text('Narudzba PO-2048'), findsOneWidget);
+    expect(find.text('Detalji narudžbe'), findsOneWidget);
+    expect(find.text('Narudžba PO-2048'), findsOneWidget);
     expect(find.text('Blue Harbor Supply'), findsWidgets);
     await tester.scrollUntilVisible(
       find.text('Ukupni iznosi'),
@@ -1349,8 +1404,8 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Povijest statusa'), findsOneWidget);
-    expect(find.text('Narudzba kreirana'), findsOneWidget);
-    expect(find.text('Narudzba poslana'), findsOneWidget);
+    expect(find.text('Narudžba kreirana'), findsOneWidget);
+    expect(find.text('Narudžba poslana'), findsOneWidget);
     expect(find.text('Primka kreirana'), findsOneWidget);
     expect(find.text('Trenutni status'), findsOneWidget);
     expect(find.text('Kreirao: Ana Admin'), findsOneWidget);
@@ -1411,7 +1466,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-2048').first);
@@ -1420,7 +1475,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpAndSettle();
 
     expect(find.text('Detalji nisu dostupni'), findsOneWidget);
-    expect(find.text('Pokusaj ponovno'), findsOneWidget);
+    expect(find.text('Pokušaj ponovno'), findsOneWidget);
   });
 
   testWidgets('shows user-facing error state when purchase orders fail', (
@@ -1454,11 +1509,11 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
-    expect(find.text('Pokusaj ponovno'), findsOneWidget);
+    expect(find.text('Narudžbe nisu dostupne'), findsOneWidget);
+    expect(find.text('Pokušaj ponovno'), findsOneWidget);
   });
 
   testWidgets('shows retryable error state when purchase orders time out', (
@@ -1495,12 +1550,12 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
+    expect(find.text('Narudžbe nisu dostupne'), findsOneWidget);
     expect(find.text(connectivityIssueMessage), findsOneWidget);
-    expect(find.text('Pokusaj ponovno'), findsOneWidget);
+    expect(find.text('Pokušaj ponovno'), findsOneWidget);
   });
 
   testWidgets('recovers purchase orders after retry when connectivity returns', (
@@ -1553,13 +1608,13 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Narudzbe nisu dostupne'), findsOneWidget);
+    expect(find.text('Narudžbe nisu dostupne'), findsOneWidget);
     expect(find.text(connectivityIssueMessage), findsOneWidget);
 
-    await tester.tap(find.text('Pokusaj ponovno'));
+    await tester.tap(find.text('Pokušaj ponovno'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
@@ -1588,7 +1643,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(await harness.storage.readToken(), isNull);
   });
 
-  testWidgets('applies and resets purchase order filters on mobile', (
+  testWidgets('applies and resets purchase order filters on mobile with datepicker fields', (
     tester,
   ) async {
     final harness = await _createHarness(
@@ -1646,7 +1701,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Filteri'));
@@ -1662,14 +1717,34 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.tap(find.text('Blue Harbor Supply').last);
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const Key('po-filter-ordered-from')),
-      '2026-04-02',
+    await tester.tap(find.byKey(const Key('po-filter-ordered-from')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(find.text('2').last);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DatePickerDialog),
+        matching: find.byType(TextButton),
+      ).last,
     );
-    await tester.enterText(
-      find.byKey(const Key('po-filter-ordered-to')),
-      '2026-04-03',
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-filter-ordered-to')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(find.text('3').last);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DatePickerDialog),
+        matching: find.byType(TextButton),
+      ).last,
     );
+    await tester.pumpAndSettle();
+
+    expect(find.text('02.04.2026.'), findsOneWidget);
+    expect(find.text('03.04.2026.'), findsOneWidget);
 
     await tester.tap(find.text('Primijeni'));
     await tester.pump();
@@ -1677,7 +1752,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
 
     expect(find.textContaining('PO-FILTERED'), findsOneWidget);
     expect(find.text('Status: Poslana'), findsOneWidget);
-    expect(find.text('Dobavljac: Blue Harbor Supply'), findsOneWidget);
+    expect(find.text('Dobavljač: Blue Harbor Supply'), findsOneWidget);
 
     await tester.tap(find.text('Reset'));
     await tester.pump();
@@ -1749,7 +1824,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Filteri'));
@@ -1764,7 +1839,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('Nema aktivnih narudzbi'), findsOneWidget);
+    expect(find.text('Nema aktivnih narudžbi'), findsOneWidget);
     expect(find.text('Status: Poslana'), findsOneWidget);
   });
 
@@ -1887,7 +1962,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Filteri'));
@@ -2008,21 +2083,21 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('PO-001'), findsOneWidget);
     expect(find.textContaining('PO-002'), findsOneWidget);
     expect(find.textContaining('PO-003'), findsNothing);
-    expect(find.text('Ucitaj jos'), findsOneWidget);
-    expect(find.text('Prikazano 2 od 3 narudzbi.'), findsOneWidget);
+    expect(find.text('Učitaj još'), findsOneWidget);
+    expect(find.text('Prikazano 2 od 3 narudžbi.'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('po-load-more')));
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.textContaining('PO-003'), findsOneWidget);
-    expect(find.text('Ucitaj jos'), findsNothing);
+    expect(find.text('Učitaj još'), findsNothing);
   });
 
   testWidgets('keeps active filters applied across purchase order pagination', (
@@ -2116,7 +2191,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Filteri'));
@@ -2260,8 +2335,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildMozartTheme(),
+      _testMaterialApp(
         home: PurchaseOrderFormScreen(
           session: session,
           repository: repository,
@@ -2272,21 +2346,21 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('po-line-0-quantity')), '5');
-    await tester.pageBack();
+    await tester.tap(find.byIcon(Icons.arrow_back).first);
     await tester.pumpAndSettle();
 
     expect(find.text('Odbaciti promjene?'), findsOneWidget);
 
     await tester.tap(find.text('Nastavi uredjivati'));
     await tester.pumpAndSettle();
-    expect(find.text('Uredi narudzbu'), findsOneWidget);
+    expect(find.text('Uredi narudžbu'), findsOneWidget);
 
-    await tester.pageBack();
+    await tester.tap(find.byIcon(Icons.arrow_back).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Odbaci promjene'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Uredi narudzbu'), findsNothing);
+    expect(find.text('Uredi narudžbu'), findsNothing);
   });
 
   testWidgets('warns before discarding unsaved warehouse receipt changes', (
@@ -2337,8 +2411,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildMozartTheme(),
+      _testMaterialApp(
         home: Builder(
           builder: (context) => Scaffold(
             body: Center(
@@ -2369,7 +2442,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
       find.byKey(const Key('po-receipt-invoice-code')),
       'INV-2026-001',
     );
-    await tester.pageBack();
+    await tester.tap(find.byIcon(Icons.arrow_back).first);
     await tester.pumpAndSettle();
 
     expect(find.text('Odbaciti promjene?'), findsOneWidget);
@@ -2378,7 +2451,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpAndSettle();
     expect(find.text('Zaprimanje robe'), findsOneWidget);
 
-    await tester.pageBack();
+    await tester.tap(find.byIcon(Icons.arrow_back).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Odbaci promjene'));
     await tester.pumpAndSettle();
@@ -2436,8 +2509,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildMozartTheme(),
+      _testMaterialApp(
         home: PurchaseOrderDetailScreen(
           orderId: 2049,
           session: session,
@@ -2613,7 +2685,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(_navigationDestinationFinder('Narudzbe'));
+    await tester.tap(_navigationDestinationFinder('Narudžbe'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-SEND').first);
@@ -2621,16 +2693,16 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
 
-    expect(find.text('Detalji narudzbe'), findsOneWidget);
-    expect(find.text('Posalji narudzbu'), findsOneWidget);
+    expect(find.text('Detalji narudžbe'), findsOneWidget);
+    expect(find.text('Pošalji narudžbu'), findsOneWidget);
 
-    await tester.tap(find.text('Posalji narudzbu'));
+    await tester.tap(find.text('Pošalji narudžbu'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
 
-    expect(find.text('Narudzba je uspjesno poslana.'), findsOneWidget);
-    expect(find.text('Posalji narudzbu'), findsNothing);
+    expect(find.text('Narudžba je uspješno poslana.'), findsOneWidget);
+    expect(find.text('Pošalji narudžbu'), findsNothing);
     expect(find.text('Poslana'), findsWidgets);
   });
 
@@ -2763,7 +2835,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Narudzbe').last);
+    await tester.tap(find.text('Narudžbe').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-RECEIPT').first);
@@ -2798,7 +2870,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect((body['items'] as List).single['purchase_order_item_id'], 8);
     expect((body['items'] as List).single['received_quantity'], '6.0');
 
-    expect(find.text('Zaprimanje robe je uspjesno spremljeno.'), findsOneWidget);
+    expect(find.text('Zaprimanje robe je uspješno spremljeno.'), findsOneWidget);
     expect(find.text('Sve stavke s narudzbe su zaprimljene'), findsWidgets);
     expect(find.text('Zaprimanje robe'), findsNothing);
   });
@@ -2950,7 +3022,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Narudzbe').last);
+    await tester.tap(find.text('Narudžbe').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-2048').first);
@@ -2982,7 +3054,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(body['currency'], 'EUR');
     expect(body['reason'], 'Supplier correction');
 
-    expect(find.text('Cijena stavke je uspjesno azurirana.'), findsOneWidget);
+    expect(find.text('Cijena stavke je uspješno ažurirana.'), findsOneWidget);
     expect(find.textContaining('EUR 140,00'), findsWidgets);
     expect(find.textContaining('EUR 14,00'), findsWidgets);
   });
@@ -3095,7 +3167,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.pumpWidget(harness.app);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Narudzbe').last);
+    await tester.tap(find.text('Narudžbe').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.textContaining('PO-2049').first);
@@ -3222,8 +3294,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
       );
 
       await tester.pumpWidget(
-        MaterialApp(
-          theme: buildMozartTheme(),
+        _testMaterialApp(
           home: PurchaseOrderFormScreen(
             session: session,
             repository: repository,
@@ -3492,8 +3563,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildMozartTheme(),
+      _testMaterialApp(
         home: PurchaseOrderFormScreen(
           session: session,
           repository: repository,
@@ -3569,10 +3639,7 @@ Future<_Harness> _createHarness({
     ),
     child: SessionScope(
       controller: sessionController,
-      child: MaterialApp(
-        theme: buildMozartTheme(),
-        home: const AppView(),
-      ),
+      child: _testMaterialApp(home: const AppView()),
     ),
   );
 
@@ -3624,6 +3691,19 @@ class _Harness {
   final Widget app;
   final SessionController controller;
   final AuthStorage storage;
+}
+
+MaterialApp _testMaterialApp({required Widget home}) {
+  return MaterialApp(
+    theme: buildMozartTheme(),
+    locale: const Locale('hr', 'HR'),
+    supportedLocales: const [
+      Locale('hr', 'HR'),
+      Locale('en', 'US'),
+    ],
+    localizationsDelegates: GlobalMaterialLocalizations.delegates,
+    home: home,
+  );
 }
 
 Finder _navigationDestinationFinder(String label) {

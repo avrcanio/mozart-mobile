@@ -114,7 +114,7 @@ class PurchaseOrdersController extends ValueNotifier<PurchaseOrdersState> {
         isLoading: false,
         errorMessage: isConnectivityIssue(error)
             ? connectivityIssueMessage
-            : 'Narudzbe trenutno nisu dostupne. Osvjezite prikaz i pokusajte ponovno.',
+            : 'Narud\u017Ebe trenutno nisu dostupne. Osvje\u017Eite prikaz i poku\u0161ajte ponovno.',
       );
     }
   }
@@ -150,7 +150,7 @@ class PurchaseOrdersController extends ValueNotifier<PurchaseOrdersState> {
         isLoadingMore: false,
         loadMoreErrorMessage: isConnectivityIssue(error)
             ? connectivityIssueMessage
-            : 'Dodatne narudzbe trenutno nisu dostupne. Pokusajte ponovno.',
+            : 'Dodatne narud\u017Ebe trenutno nisu dostupne. Poku\u0161ajte ponovno.',
       );
     }
   }

@@ -199,9 +199,9 @@ class PurchaseOrderDto {
   List<PurchaseOrderHistoryEntry> _buildHistory() {
     final entries = <PurchaseOrderHistoryEntry>[
       PurchaseOrderHistoryEntry(
-        title: 'Narudzba kreirana',
+        title: 'Narudžba kreirana',
         description: createdBy.isEmpty
-            ? 'Narudzba je evidentirana u sustavu.'
+            ? 'Narudžba je evidentirana u sustavu.'
             : 'Kreirao: $createdBy',
         occurredAt: orderedAt,
       ),
@@ -210,8 +210,8 @@ class PurchaseOrderDto {
     if (sentAt != null) {
       entries.add(
         PurchaseOrderHistoryEntry(
-          title: 'Narudzba poslana',
-          description: 'Narudzba je poslana dobavljacu.',
+          title: 'Narudžba poslana',
+          description: 'Narudžba je poslana dobavljaču.',
           occurredAt: sentAt,
         ),
       );

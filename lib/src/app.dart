@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/theme/app_theme.dart';
 import 'data/auth/auth_repository.dart';
@@ -69,6 +70,12 @@ class _MozartMobileAppState extends State<MozartMobileApp> {
           title: 'Mozart Mobile',
           theme: buildMozartTheme(),
           debugShowCheckedModeBanner: false,
+          locale: const Locale('hr', 'HR'),
+          supportedLocales: const [
+            Locale('hr', 'HR'),
+            Locale('en', 'US'),
+          ],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
           home: const AppView(),
         ),
       ),

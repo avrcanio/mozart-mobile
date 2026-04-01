@@ -98,7 +98,7 @@ class PurchaseOrderDetailController
       value = value.copyWith(
         isLoading: false,
         errorMessage:
-            'Detalji narudzbe trenutno nisu dostupni. Pokusajte ponovno.',
+            'Detalji narud\u017Ebe trenutno nisu dostupni. Poku\u0161ajte ponovno.',
       );
     }
   }
@@ -124,7 +124,7 @@ class PurchaseOrderDetailController
       value = value.copyWith(
         isSending: false,
         order: order,
-        actionMessage: 'Narudzba je uspjesno poslana.',
+        actionMessage: 'Narud\u017Eba je uspje\u0161no poslana.',
         clearActionError: true,
       );
       return true;
@@ -132,7 +132,7 @@ class PurchaseOrderDetailController
       value = value.copyWith(
         isSending: false,
         actionErrorMessage:
-            'Slanje narudzbe nije uspjelo. Pokusajte ponovno.',
+            'Slanje narud\u017Ebe nije uspjelo. Poku\u0161ajte ponovno.',
       );
       return false;
     }
@@ -168,7 +168,7 @@ class PurchaseOrderDetailController
         isUpdatingPrice: false,
         activePriceItemId: null,
         order: order,
-        actionMessage: 'Cijena stavke je uspjesno azurirana.',
+        actionMessage: 'Cijena stavke je uspješno ažurirana.',
         clearActionError: true,
       );
       return true;
@@ -183,7 +183,7 @@ class PurchaseOrderDetailController
       value = value.copyWith(
         isUpdatingPrice: false,
         activePriceItemId: null,
-        actionErrorMessage: 'Promjena cijene nije uspjela. Pokusajte ponovno.',
+        actionErrorMessage: 'Promjena cijene nije uspjela. Pokušajte ponovno.',
       );
       return false;
     }

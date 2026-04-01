@@ -148,7 +148,7 @@ class _MailboxDetailBody extends StatelessWidget {
         icon: Icons.wifi_off_rounded,
         title: 'Detalji poruke nisu dostupni',
         message: state.errorMessage!,
-        actionLabel: 'Pokusaj ponovno',
+        actionLabel: 'Pokušaj ponovno',
         onAction: onRetry,
       );
     }
