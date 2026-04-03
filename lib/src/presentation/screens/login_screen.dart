@@ -3,9 +3,16 @@ import 'package:flutter/material.dart';
 import '../session_scope.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({required this.state, super.key});
+  const LoginScreen({
+    required this.state,
+    this.currentServerUrl,
+    this.onChangeServer,
+    super.key,
+  });
 
   final SessionState state;
+  final String? currentServerUrl;
+  final VoidCallback? onChangeServer;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -136,6 +143,26 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                               ),
+                              if (widget.onChangeServer != null) ...[
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    key: const Key('login-change-server'),
+                                    onPressed: widget.state.isLoading
+                                        ? null
+                                        : widget.onChangeServer,
+                                    child: const Text('Promijeni server'),
+                                  ),
+                                ),
+                                if (widget.currentServerUrl != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    widget.currentServerUrl!,
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                                ],
+                              ],
                             ],
                           ),
                         ),

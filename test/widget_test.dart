@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:ordino/src/core/theme/app_theme.dart';
+import 'package:ordino/src/data/app_config/app_config_storage.dart';
 import 'package:ordino/src/data/auth/auth_repository.dart';
 import 'package:ordino/src/data/auth/auth_storage.dart';
 import 'package:ordino/src/data/dashboard/dashboard_repository.dart';
@@ -41,6 +42,84 @@ void main() {
 
     expect(find.text('Ordino'), findsOneWidget);
     expect(find.text('Prijava'), findsOneWidget);
+  });
+
+  testWidgets('shows server setup before login when no server url is saved', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      responses: const <String, _FakeResponse>{},
+      hasConfiguredServer: false,
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pump();
+
+    expect(find.text('Povezivanje sa serverom'), findsOneWidget);
+    expect(find.byKey(const Key('server-url-field')), findsOneWidget);
+    expect(find.text('Prijava'), findsNothing);
+  });
+
+  testWidgets('saving server url transitions from setup to login', (
+    tester,
+  ) async {
+    final configStorage = InMemoryAppConfigStorage();
+    late _Harness harness;
+    harness = await _createHarness(
+      responses: <String, dynamic>{
+        'GET /api/me/': const _FakeResponse(statusCode: 401, body: ''),
+      },
+      hasConfiguredServer: false,
+      appConfigStorage: configStorage,
+      onSubmitServerUrl: (value) async {
+        final normalized = normalizeApiBaseUrl(value);
+        await ApiClient(
+          baseUrl: normalized,
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/me/': const _FakeResponse(statusCode: 401, body: ''),
+          }),
+        ).probeReachability();
+        await configStorage.saveApiBaseUrl(normalized);
+        harness.setConfiguredServer(normalized);
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const Key('server-url-field')),
+      ' https://example.test/ ',
+    );
+    await tester.tap(find.byKey(const Key('server-url-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Prijava'), findsOneWidget);
+    expect(await configStorage.readApiBaseUrl(), 'https://example.test');
+  });
+
+  testWidgets('login screen can open server change flow', (tester) async {
+    final configStorage = InMemoryAppConfigStorage(
+      apiBaseUrl: 'https://example.test',
+    );
+    late _Harness harness;
+    harness = await _createHarness(
+      responses: const <String, _FakeResponse>{},
+      appConfigStorage: configStorage,
+      currentServerUrl: 'https://example.test',
+      onChangeServer: () {
+        harness.setHasConfiguredServer(false);
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('login-change-server')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('server-url-field')), findsOneWidget);
+    expect(find.text('https://example.test'), findsOneWidget);
   });
 
   testWidgets('boots into authenticated dashboard with restored session', (
@@ -5003,12 +5082,77 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect((body['items'] as List).single['quantity'], '1.5');
     expect((body['items'] as List).single['price'], '12.50');
   });
+
+  test('normalizes and validates runtime api base url', () {
+    expect(
+      normalizeApiBaseUrl(' https://example.test/ '),
+      'https://example.test',
+    );
+    expect(normalizeApiBaseUrl('http://intranet.local'), 'http://intranet.local');
+    expect(() => normalizeApiBaseUrl(''), throwsA(isA<FormatException>()));
+    expect(
+      () => normalizeApiBaseUrl('example.test'),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('saved runtime url overrides fallback config', () {
+    expect(
+      resolveApiBaseUrl(
+        'https://saved.example',
+        fallbackUrl: 'https://fallback.example',
+      ),
+      'https://saved.example',
+    );
+    expect(
+      resolveApiBaseUrl(null, fallbackUrl: 'https://fallback.example'),
+      'https://fallback.example',
+    );
+    expect(
+      resolveApiBaseUrl('   ', fallbackUrl: 'https://fallback.example'),
+      'https://fallback.example',
+    );
+  });
+
+  test('reachability probe accepts non-success http responses', () async {
+    final client = ApiClient(
+      baseUrl: 'https://example.test',
+      transport: _FakeTransport(<String, dynamic>{
+        'GET /api/me/': const _FakeResponse(statusCode: 401, body: ''),
+      }),
+    );
+
+    await client.probeReachability();
+  });
+
+  test('reachability probe surfaces connectivity failures', () async {
+    final client = ApiClient(
+      baseUrl: 'https://example.test',
+      transport: _SocketFailureTransport(),
+    );
+
+    await expectLater(
+      client.probeReachability(),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.isConnectivityIssue,
+          'isConnectivityIssue',
+          true,
+        ),
+      ),
+    );
+  });
 }
 
 Future<_Harness> _createHarness({
   required Map<String, dynamic> responses,
   String? savedToken,
   Duration requestTimeout = const Duration(seconds: 15),
+  bool hasConfiguredServer = true,
+  String? currentServerUrl,
+  InMemoryAppConfigStorage? appConfigStorage,
+  Future<void> Function(String value)? onSubmitServerUrl,
+  VoidCallback? onChangeServer,
 }) async {
   final transport = _FakeTransport(responses);
   final apiClient = ApiClient(
@@ -5017,6 +5161,11 @@ Future<_Harness> _createHarness({
     requestTimeout: requestTimeout,
   );
   final storage = InMemoryAuthStorage();
+  final configStorage =
+      appConfigStorage ??
+      InMemoryAppConfigStorage(
+        apiBaseUrl: currentServerUrl ?? 'https://example.test',
+      );
   if (savedToken != null) {
     await storage.saveToken(savedToken);
   }
@@ -5030,7 +5179,18 @@ Future<_Harness> _createHarness({
   );
   final sessionController = SessionController(authRepository: authRepository)
     ..restore();
+  final appState = ValueNotifier<_HarnessAppState>(
+    _HarnessAppState(
+      hasConfiguredServer: hasConfiguredServer,
+      isConfigLoading: false,
+      currentServerUrl:
+          currentServerUrl ??
+          (hasConfiguredServer ? 'https://example.test' : null),
+      serverUrlErrorMessage: null,
+    ),
+  );
 
+  late final _Harness harness;
   final app = AppServicesScope(
     services: AppServices(
       dashboardRepository: dashboardRepository,
@@ -5039,11 +5199,46 @@ Future<_Harness> _createHarness({
     ),
     child: SessionScope(
       controller: sessionController,
-      child: _testMaterialApp(home: const AppView()),
+      child: ValueListenableBuilder<_HarnessAppState>(
+        valueListenable: appState,
+        builder: (context, state, _) {
+          return _testMaterialApp(
+            home: AppView(
+              hasConfiguredServer: state.hasConfiguredServer,
+              isConfigLoading: state.isConfigLoading,
+              currentServerUrl: state.currentServerUrl,
+              serverUrlErrorMessage: state.serverUrlErrorMessage,
+              onSubmitServerUrl: (value) async {
+                if (onSubmitServerUrl != null) {
+                  await onSubmitServerUrl(value);
+                  return;
+                }
+
+                final normalized = normalizeApiBaseUrl(value);
+                await configStorage.saveApiBaseUrl(normalized);
+                harness.setConfiguredServer(normalized);
+              },
+              onChangeServer:
+                  onChangeServer ??
+                  () {
+                    harness.setHasConfiguredServer(false);
+                  },
+            ),
+          );
+        },
+      ),
     ),
   );
 
-  return _Harness(app: app, controller: sessionController, storage: storage);
+  harness = _Harness(
+    app: app,
+    controller: sessionController,
+    storage: storage,
+    configStorage: configStorage,
+    appState: appState,
+  );
+
+  return harness;
 }
 
 _FakeResponse _jsonResponse(Map<String, dynamic> json) {
@@ -5079,11 +5274,47 @@ class _Harness {
     required this.app,
     required this.controller,
     required this.storage,
+    required this.configStorage,
+    required this.appState,
   });
 
   final Widget app;
   final SessionController controller;
   final AuthStorage storage;
+  final AppConfigStorage configStorage;
+  final ValueNotifier<_HarnessAppState> appState;
+
+  void setConfiguredServer(String? url) {
+    appState.value = _HarnessAppState(
+      hasConfiguredServer: url != null && url.isNotEmpty,
+      isConfigLoading: appState.value.isConfigLoading,
+      currentServerUrl: url,
+      serverUrlErrorMessage: appState.value.serverUrlErrorMessage,
+    );
+  }
+
+  void setHasConfiguredServer(bool value) {
+    appState.value = _HarnessAppState(
+      hasConfiguredServer: value,
+      isConfigLoading: appState.value.isConfigLoading,
+      currentServerUrl: appState.value.currentServerUrl,
+      serverUrlErrorMessage: appState.value.serverUrlErrorMessage,
+    );
+  }
+}
+
+class _HarnessAppState {
+  const _HarnessAppState({
+    required this.hasConfiguredServer,
+    required this.isConfigLoading,
+    required this.currentServerUrl,
+    required this.serverUrlErrorMessage,
+  });
+
+  final bool hasConfiguredServer;
+  final bool isConfigLoading;
+  final String? currentServerUrl;
+  final String? serverUrlErrorMessage;
 }
 
 MaterialApp _testMaterialApp({required Widget home}) {
