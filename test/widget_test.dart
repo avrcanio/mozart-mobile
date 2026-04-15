@@ -6390,6 +6390,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
 Future<_Harness> _createHarness({
   required Map<String, dynamic> responses,
   String? savedToken,
+  String? savedBaseUrl = 'https://example.test',
   Duration requestTimeout = const Duration(seconds: 15),
 }) async {
   final transport = _FakeTransport(responses);
@@ -6399,6 +6400,9 @@ Future<_Harness> _createHarness({
     requestTimeout: requestTimeout,
   );
   final storage = InMemoryAuthStorage();
+  if (savedBaseUrl != null) {
+    await storage.saveBaseUrl(savedBaseUrl);
+  }
   if (savedToken != null) {
     await storage.saveToken(savedToken);
   }

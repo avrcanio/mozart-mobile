@@ -27,12 +27,13 @@ class AuthRepository {
   }
 
   Future<void> saveBaseUrl(String baseUrl) async {
-    final normalizedBaseUrl = baseUrl.trim();
-    if (normalizedBaseUrl.isEmpty) {
-      throw const AuthException('URL servisa je obavezan.');
+    try {
+      final normalizedBaseUrl = normalizeApiBaseUrl(baseUrl);
+      configureBaseUrl(normalizedBaseUrl);
+      await _storage.saveBaseUrl(normalizedBaseUrl);
+    } on FormatException catch (error) {
+      throw AuthException(error.message);
     }
-    configureBaseUrl(normalizedBaseUrl);
-    await _storage.saveBaseUrl(normalizedBaseUrl);
   }
 
   Future<void> clearBaseUrl() async {

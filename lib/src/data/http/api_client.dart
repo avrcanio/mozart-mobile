@@ -4,6 +4,34 @@ import 'dart:io';
 
 typedef JsonMap = Map<String, dynamic>;
 
+String normalizeApiBaseUrl(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    throw const FormatException('URL servisa je obavezan.');
+  }
+
+  final normalized = trimmed.replaceAll(RegExp(r'/+$'), '');
+  final uri = Uri.tryParse(normalized);
+  if (uri == null ||
+      !(uri.scheme == 'http' || uri.scheme == 'https') ||
+      uri.host.trim().isEmpty) {
+    throw const FormatException('URL servisa nije ispravan.');
+  }
+
+  return normalized;
+}
+
+String resolveApiBaseUrl(
+  String? savedBaseUrl, {
+  required String fallbackUrl,
+}) {
+  final candidate = savedBaseUrl?.trim() ?? '';
+  if (candidate.isEmpty) {
+    return fallbackUrl;
+  }
+  return candidate;
+}
+
 class ApiClient {
   ApiClient({
     String baseUrl = const String.fromEnvironment(
@@ -12,7 +40,7 @@ class ApiClient {
     ),
     this.requestTimeout = const Duration(seconds: 15),
     ApiTransport? transport,
-  })  : _baseUrl = baseUrl,
+  })  : _baseUrl = normalizeApiBaseUrl(baseUrl),
         _transport = transport ?? HttpApiTransport();
 
   final Duration requestTimeout;
@@ -22,7 +50,18 @@ class ApiClient {
   String get baseUrl => _baseUrl;
 
   void setBaseUrl(String value) {
-    _baseUrl = value.trim();
+    final trimmed = value.trim();
+    _baseUrl = trimmed.isEmpty ? '' : normalizeApiBaseUrl(trimmed);
+  }
+
+  Future<void> probeReachability() async {
+    try {
+      await getJson('/api/me/');
+    } on ApiException catch (error) {
+      if (error.isConnectivityIssue) {
+        rethrow;
+      }
+    }
   }
 
   Future<JsonMap> getJson(

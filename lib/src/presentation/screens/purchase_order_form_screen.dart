@@ -1097,12 +1097,14 @@ class _PurchaseOrderArticleCatalogScreenState
   Widget build(BuildContext context) {
     final showCategoryJumps = _groups.length > 1;
 
-    // ignore: deprecated_member_use
     return _PurchaseOrderAndroidTheme(
-      child: WillPopScope(
-        onWillPop: () async {
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) {
+            return;
+          }
           _closeCatalog();
-          return false;
         },
         child: Scaffold(
           appBar: AppBar(
