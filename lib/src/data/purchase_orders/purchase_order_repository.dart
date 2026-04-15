@@ -42,6 +42,18 @@ class PurchaseOrderRepository {
   Uri statusEndpoint(int orderId) =>
       _apiClient.endpoint(path: '/api/purchase-orders/$orderId/status/');
 
+  Uri resolveMediaUri(String pathOrUrl) {
+    final normalized = pathOrUrl.trim();
+    if (normalized.isEmpty) {
+      throw const FormatException('Media path is empty.');
+    }
+    final parsed = Uri.tryParse(normalized);
+    if (parsed != null && parsed.hasScheme) {
+      return parsed;
+    }
+    return _apiClient.endpoint(path: normalized);
+  }
+
   Future<PurchaseOrderPage> fetchPurchaseOrdersPage({
     required String authToken,
     PurchaseOrderFilters filters = const PurchaseOrderFilters(),
@@ -211,10 +223,14 @@ class PurchaseOrderRepository {
   Future<List<SupplierArticleDto>> fetchSupplierArticles({
     required int supplierId,
     required String authToken,
+    DateTime? orderedAt,
   }) async {
     final jsonList = await _apiClient.getJsonList(
       '/api/suppliers/$supplierId/artikli/',
       authToken: authToken,
+      queryParameters: orderedAt == null
+          ? null
+          : <String, String>{'ordered_at': _formatDateOnly(orderedAt)},
     );
     return jsonList
         .whereType<Map<String, dynamic>>()
@@ -259,6 +275,13 @@ class PurchaseOrderRepository {
       return value.trim();
     }
     return null;
+  }
+
+  static String _formatDateOnly(DateTime value) {
+    final local = value.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day';
   }
 }
 
