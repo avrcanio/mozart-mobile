@@ -5905,6 +5905,504 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     },
   );
 
+  testWidgets(
+    'supports packaging quantities and submits computed base quantity',
+    (tester) async {
+      ApiRequest? capturedRequest;
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 77,
+                    'artikl_name': 'Stella Artois pivo 0,33l',
+                    'unit_of_measure': 1,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0.10,
+                    'category_name': 'Svijetlo pivo',
+                    'packaging_path': 'komad -> 24/gajba -> 60/paleta',
+                    'packaging_levels': <Map<String, dynamic>>[
+                      <String, dynamic>{
+                        'id': 123,
+                        'sort_order': 0,
+                        'unit_of_measure': 1,
+                        'unit_name': 'Komad',
+                        'level_name': 'komad',
+                        'is_base': true,
+                        'base_quantity_total': 1,
+                        'contains_previous': null,
+                      },
+                      <String, dynamic>{
+                        'id': 124,
+                        'sort_order': 1,
+                        'unit_of_measure': 2,
+                        'unit_name': 'Gajba',
+                        'level_name': 'gajba',
+                        'is_base': false,
+                        'base_quantity_total': 24,
+                        'contains_previous': '24.0000',
+                      },
+                      <String, dynamic>{
+                        'id': 125,
+                        'sort_order': 2,
+                        'unit_of_measure': 3,
+                        'unit_name': 'Paleta',
+                        'level_name': 'paleta',
+                        'is_base': false,
+                        'base_quantity_total': 1440,
+                        'contains_previous': '60.0000',
+                      },
+                    ],
+                  },
+                ]),
+            'POST /api/purchase-orders/': (ApiRequest request) {
+              capturedRequest = request;
+              return _jsonResponse(<String, dynamic>{
+                'id': 91,
+                'reference': 'PO-PACK',
+                'supplier': 2,
+                'supplier_name': 'Blue Harbor Supply',
+                'status': 'created',
+                'status_display': 'Kreirana',
+                'payment_type': 5,
+                'payment_type_name': 'Virman',
+                'ordered_at': '2026-04-15T09:30:00Z',
+                'total_gross': '120.00',
+                'items': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 1,
+                    'artikl': 77,
+                    'artikl_name': 'Stella Artois pivo 0,33l',
+                    'quantity': '1488.0000',
+                    'unit_of_measure': 1,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                    'received_quantity': '0.0000',
+                    'remaining_quantity': '1488.0000',
+                    'base_group': '',
+                  },
+                ],
+              });
+            },
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-catalog-article-77')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('komad -> 24/gajba -> 60/paleta'), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-2')), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-3')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('po-catalog-packaging-2')),
+        '2',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('po-catalog-quantity')))
+            .controller!
+            .text,
+        '48',
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('po-catalog-packaging-3')),
+        '1',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('po-catalog-quantity')))
+            .controller!
+            .text,
+        '1488',
+      );
+
+      await tester.tap(find.byKey(const Key('po-catalog-submit')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('po-catalog-ordered-77')), findsOneWidget);
+      expect(find.textContaining('Naruceno:'), findsOneWidget);
+      expect(find.textContaining('2 gajba'), findsOneWidget);
+      expect(find.textContaining('1 paleta'), findsOneWidget);
+      expect(find.textContaining('1488 komada'), findsOneWidget);
+
+      tester
+          .widget<BackButton>(find.byKey(const Key('po-catalog-back')))
+          .onPressed!
+          .call();
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('po-form-save')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('po-form-save')));
+      await tester.pumpAndSettle();
+
+      final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+      final items = body['items'] as List<dynamic>;
+      expect(items, hasLength(1));
+      expect((items.first as Map<String, dynamic>)['quantity'], '1488');
+    },
+  );
+
+  testWidgets(
+    'loads packaging levels from article detail when supplier catalog omits them',
+    (tester) async {
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 171,
+                    'rm_id': 651,
+                    'name': 'Stella Artois pivo 0,33l',
+                    'image_50x75': 'https://example.test/image-50x75.png',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0,
+                    'category_id': 66,
+                    'category_name': 'Svijetlo pivo',
+                    'category_sort_order': 3110,
+                    'unit_of_measure': 3,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                  },
+                ]),
+            'GET /api/artikli/651/': _jsonResponse(<String, dynamic>{
+              'rm_id': 651,
+              'name': 'Stella Artois pivo 0,33l',
+              'code': '3850131481011',
+              'image_50x75': 'https://example.test/image-50x75.png',
+              'vat_rate': 0.25,
+              'deposit_amount': 0,
+              'category_id': 66,
+              'category_name': 'Svijetlo pivo',
+              'category_sort_order': 3110,
+              'packaging_path': 'komad -> 24/gajba',
+              'packaging_levels': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 345,
+                  'sort_order': 0,
+                  'unit_of_measure': 3,
+                  'unit_name': 'Komad',
+                  'level_name': 'komad',
+                  'is_base': true,
+                  'base_quantity_total': 1,
+                  'contains_previous': null,
+                },
+                <String, dynamic>{
+                  'id': 440,
+                  'sort_order': 1,
+                  'unit_of_measure': 8,
+                  'unit_name': 'Gajba',
+                  'level_name': 'gajba',
+                  'is_base': false,
+                  'base_quantity_total': 24,
+                  'contains_previous': '24.0000',
+                },
+              ],
+            }),
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('po-catalog-article-171')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('komad -> 24/gajba'), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-8')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'derives article reference id from image url when supplier catalog omits rm_id',
+    (tester) async {
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 171,
+                    'name': 'Stella Artois pivo 0,33l',
+                    'image_50x75':
+                        'https://example.test/api/artikli/651/image-50x75/',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0,
+                    'category_name': 'Svijetlo pivo',
+                    'unit_of_measure': 3,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                  },
+                ]),
+            'GET /api/artikli/651/': _jsonResponse(<String, dynamic>{
+              'rm_id': 651,
+              'name': 'Stella Artois pivo 0,33l',
+              'packaging_path': 'komad -> 24/gajba',
+              'packaging_levels': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 345,
+                  'sort_order': 0,
+                  'unit_of_measure': 3,
+                  'unit_name': 'Komad',
+                  'level_name': 'komad',
+                  'is_base': true,
+                  'base_quantity_total': 1,
+                  'contains_previous': null,
+                },
+                <String, dynamic>{
+                  'id': 440,
+                  'sort_order': 1,
+                  'unit_of_measure': 8,
+                  'unit_name': 'Gajba',
+                  'level_name': 'gajba',
+                  'is_base': false,
+                  'base_quantity_total': 24,
+                  'contains_previous': '24.0000',
+                },
+              ],
+            }),
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('po-catalog-article-171')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('komad -> 24/gajba'), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-8')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'supports backend packaging detail with artikl_rm_id and minimal packaging level fields',
+    (tester) async {
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 171,
+                    'name': 'Stella Artois pivo 0,33l',
+                    'image_50x75':
+                        'https://example.test/api/artikli/651/image-50x75/',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0,
+                    'unit_of_measure': 3,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                  },
+                ]),
+            'GET /api/artikli/651/': _jsonResponse(<String, dynamic>{
+              'artikl_rm_id': 651,
+              'name': 'Stella Artois pivo 0,33l',
+              'packaging_path': 'komad -> 24/gajba',
+              'packaging_levels': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'sort_order': 0,
+                  'unit_name': 'Komad',
+                  'level_name': 'komad',
+                  'base_quantity_total': 1,
+                },
+                <String, dynamic>{
+                  'sort_order': 1,
+                  'unit_name': 'Gajba',
+                  'level_name': 'gajba',
+                  'base_quantity_total': 24,
+                },
+              ],
+            }),
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('po-catalog-article-171')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('komad -> 24/gajba'), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-2')), findsOneWidget);
+    },
+  );
+
   test('normalizes and validates runtime api base url', () {
     expect(
       normalizeApiBaseUrl(' https://example.test/ '),

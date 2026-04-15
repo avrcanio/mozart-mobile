@@ -232,10 +232,54 @@ class PurchaseOrderRepository {
           ? null
           : <String, String>{'ordered_at': _formatDateOnly(orderedAt)},
     );
-    return jsonList
+    // Debug trace for supplier article payload shape and identifier mapping.
+    // ignore: avoid_print
+    print(
+      '[po-articles] raw fetch supplierId=$supplierId orderedAt=${orderedAt == null ? "" : _formatDateOnly(orderedAt)} count=${jsonList.length}',
+    );
+    for (final item in jsonList.whereType<Map<String, dynamic>>().take(5)) {
+      // ignore: avoid_print
+      print(
+        '[po-articles] raw item '
+        'id=${item['id']} '
+        'rm_id=${item['rm_id']} '
+        'artikl=${item['artikl']} '
+        'artikl_id=${item['artikl_id']} '
+        'name=${item['name'] ?? item['artikl_name']} '
+        'image_50x75=${item['image_50x75'] ?? ""} '
+        'image_46x75=${item['image_46x75'] ?? ""} '
+        'image=${item['image'] ?? ""}',
+      );
+    }
+    final articles = jsonList
         .whereType<Map<String, dynamic>>()
         .map(SupplierArticleDto.fromJson)
         .toList();
+    for (final article in articles.take(5)) {
+      // ignore: avoid_print
+      print(
+        '[po-articles] parsed item '
+        'id=${article.id} '
+        'referenceId=${article.referenceId} '
+        'name="${article.name}" '
+        'thumbnailUrl=${article.thumbnailUrl ?? ""}',
+      );
+    }
+    return articles;
+  }
+
+  Future<SupplierArticleDto> fetchArticleDetail({
+    required int articleId,
+    required String authToken,
+  }) async {
+    // Debug trace for packaging enrichment on quantity screen.
+    // ignore: avoid_print
+    print('[po-quantity] repository fetchArticleDetail: articleId=$articleId');
+    final json = await _apiClient.getJson(
+      '/api/artikli/$articleId/',
+      authToken: authToken,
+    );
+    return SupplierArticleDto.fromJson(json);
   }
 
   Future<PurchaseOrder> createPurchaseOrder({
