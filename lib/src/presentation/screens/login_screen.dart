@@ -46,124 +46,127 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - 44,
-                  ),
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 460),
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(28),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.asset(
-                                      'a615db41-8bb6-4618-b76c-2789193b99dc.png',
-                                      key: const Key('login-brand-mark'),
-                                      width: 52,
-                                      height: 52,
-                                      fit: BoxFit.cover,
+              return Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 44,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 460),
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(28),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.asset(
+                                        'a615db41-8bb6-4618-b76c-2789193b99dc.png',
+                                        key: const Key('login-brand-mark'),
+                                        width: 52,
+                                        height: 52,
+                                        fit: BoxFit.cover,
+                                      ),
                                     ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Text(
+                                        'Ordino',
+                                        style: theme.textTheme.displaySmall,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Pristupite narudÅ¾bama, porukama i dnevnim zadacima na jednom mjestu.',
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                const SizedBox(height: 28),
+                                TextField(
+                                  controller: _usernameController,
+                                  autocorrect: false,
+                                  textInputAction: TextInputAction.next,
+                                  decoration: const InputDecoration(
+                                    labelText: 'KorisniÄko ime',
+                                    hintText: 'Unesite korisniÄko ime',
                                   ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Text(
-                                      'Ordino',
-                                      style: theme.textTheme.displaySmall,
+                                ),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: _passwordController,
+                                  obscureText: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Lozinka',
+                                    hintText: 'Unesite lozinku',
+                                  ),
+                                ),
+                                if (widget.state.errorMessage != null) ...[
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    widget.state.errorMessage!,
+                                    style: TextStyle(
+                                      color: theme.colorScheme.error,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ],
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Pristupite narudžbama, porukama i dnevnim zadacima na jednom mjestu.',
-                                style: theme.textTheme.bodyLarge,
-                              ),
-                              const SizedBox(height: 28),
-                              TextField(
-                                controller: _usernameController,
-                                autocorrect: false,
-                                textInputAction: TextInputAction.next,
-                                decoration: const InputDecoration(
-                                  labelText: 'Korisničko ime',
-                                  hintText: 'Unesite korisničko ime',
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              TextField(
-                                controller: _passwordController,
-                                obscureText: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'Lozinka',
-                                  hintText: 'Unesite lozinku',
-                                ),
-                              ),
-                              if (widget.state.errorMessage != null) ...[
-                                const SizedBox(height: 16),
-                                Text(
-                                  widget.state.errorMessage!,
-                                  style: TextStyle(
-                                    color: theme.colorScheme.error,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 24),
-                              SizedBox(
-                                width: double.infinity,
-                                child: FilledButton(
-                                  onPressed: widget.state.isLoading
-                                      ? null
-                                      : () {
-                                          controller.login(
-                                            username: _usernameController.text,
-                                            password: _passwordController.text,
-                                          );
-                                        },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    child: Text(
-                                      widget.state.isLoading
-                                          ? 'Povezivanje...'
-                                          : 'Prijava',
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (widget.onChangeServer != null) ...[
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    key: const Key('login-change-server'),
+                                const SizedBox(height: 24),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton(
                                     onPressed: widget.state.isLoading
                                         ? null
-                                        : widget.onChangeServer,
-                                    child: const Text('Promijeni server'),
+                                        : () {
+                                            controller.login(
+                                              username:
+                                                  _usernameController.text,
+                                              password:
+                                                  _passwordController.text,
+                                            );
+                                          },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      child: Text(
+                                        widget.state.isLoading
+                                            ? 'Povezivanje...'
+                                            : 'Prijava',
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                if (widget.currentServerUrl != null) ...[
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    widget.currentServerUrl!,
-                                    style: theme.textTheme.bodySmall,
+                                if (widget.onChangeServer != null) ...[
+                                  const SizedBox(height: 12),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      key: const Key('login-change-server'),
+                                      onPressed: widget.state.isLoading
+                                          ? null
+                                          : widget.onChangeServer,
+                                      child: const Text('Promijeni server'),
+                                    ),
                                   ),
+                                  if (widget.currentServerUrl != null) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      widget.currentServerUrl!,
+                                      style: theme.textTheme.bodySmall,
+                                    ),
+                                  ],
                                 ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ),

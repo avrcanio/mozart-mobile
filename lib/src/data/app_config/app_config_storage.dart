@@ -1,4 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/services.dart';
+
+import '../auth/auth_storage.dart';
 
 const String defaultMozartApiBaseUrl = String.fromEnvironment(
   'MOZART_API_BASE_URL',
@@ -43,25 +46,42 @@ abstract class AppConfigStorage {
 class SecureAppConfigStorage implements AppConfigStorage {
   SecureAppConfigStorage({
     FlutterSecureStorage? storage,
-  }) : _storage = storage ?? const FlutterSecureStorage();
+    PlainKeyValueStore? fallbackStore,
+  }) : _storage = storage ?? const FlutterSecureStorage(),
+       _fallbackStore = fallbackStore ?? const SharedPreferencesKeyValueStore();
 
   static const String apiBaseUrlKey = 'mozart_api_base_url';
 
   final FlutterSecureStorage _storage;
+  final PlainKeyValueStore _fallbackStore;
 
   @override
-  Future<void> clearApiBaseUrl() {
-    return _storage.delete(key: apiBaseUrlKey);
+  Future<void> clearApiBaseUrl() async {
+    try {
+      await _storage.delete(key: apiBaseUrlKey);
+    } on PlatformException {
+      // Fallback cleanup still needs to run when Keychain is unavailable.
+    }
+    await _fallbackStore.delete(key: apiBaseUrlKey);
   }
 
   @override
-  Future<String?> readApiBaseUrl() {
-    return _storage.read(key: apiBaseUrlKey);
+  Future<String?> readApiBaseUrl() async {
+    try {
+      return await _storage.read(key: apiBaseUrlKey);
+    } on PlatformException {
+      return _fallbackStore.read(key: apiBaseUrlKey);
+    }
   }
 
   @override
-  Future<void> saveApiBaseUrl(String url) {
-    return _storage.write(key: apiBaseUrlKey, value: url);
+  Future<void> saveApiBaseUrl(String url) async {
+    try {
+      await _storage.write(key: apiBaseUrlKey, value: url);
+      await _fallbackStore.delete(key: apiBaseUrlKey);
+    } on PlatformException {
+      await _fallbackStore.write(key: apiBaseUrlKey, value: url);
+    }
   }
 }
 
