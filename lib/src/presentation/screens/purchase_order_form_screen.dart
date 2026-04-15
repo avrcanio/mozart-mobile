@@ -838,6 +838,7 @@ class _PurchaseOrderArticleCatalogScreenState
         builder: (context) => _PurchaseOrderArticleQuantityScreen(
           article: article,
           repository: widget.repository,
+          authToken: widget.session.token,
         ),
       ),
     );
@@ -866,6 +867,41 @@ class _PurchaseOrderArticleCatalogScreenState
       total += line.parsedQuantity ?? 0;
     }
     return total;
+  }
+
+  List<String> _orderedSummaryLinesFor(SupplierArticleDto article) {
+    for (final line in _draftLines) {
+      if (line.articleId != article.id ||
+          line.unitOfMeasureId != article.unitOfMeasureId) {
+        continue;
+      }
+      final summaryLines = <String>[];
+      final packagingEntries = line.packagingQuantities.entries.toList(
+        growable: false,
+      )..sort((left, right) => left.key.compareTo(right.key));
+      for (final entry in packagingEntries) {
+        final parsed = _parseLocalizedDecimal(entry.value);
+        if (parsed == null || parsed <= 0) {
+          continue;
+        }
+        final label = line.packagingLabels[entry.key]?.trim().toLowerCase() ?? '';
+        if (label.isEmpty) {
+          continue;
+        }
+        summaryLines.add('${_formatQuantityValue(parsed)} $label');
+      }
+      if (summaryLines.isEmpty) {
+        return const <String>[];
+      }
+      final baseQuantity = line.parsedQuantity;
+      if (baseQuantity != null && baseQuantity > 0) {
+        summaryLines.add(
+          '${_formatQuantityValue(baseQuantity)} ${_formatOrderedBaseUnitLabel(line.unitName, baseQuantity)}',
+        );
+      }
+      return summaryLines;
+    }
+    return const <String>[];
   }
 
   void _handleScroll() {
@@ -1153,6 +1189,9 @@ class _PurchaseOrderArticleCatalogScreenState
                                   article: article,
                                   repository: widget.repository,
                                   orderedQuantity: _orderedQuantityFor(article),
+                                  orderedSummaryLines: _orderedSummaryLinesFor(
+                                    article,
+                                  ),
                                   onTap: () => _selectArticle(article),
                                 ),
                               ),
@@ -1174,10 +1213,12 @@ class _PurchaseOrderArticleQuantityScreen extends StatefulWidget {
   const _PurchaseOrderArticleQuantityScreen({
     required this.article,
     required this.repository,
+    required this.authToken,
   });
 
   final SupplierArticleDto article;
   final PurchaseOrderRepository repository;
+  final String authToken;
 
   @override
   State<_PurchaseOrderArticleQuantityScreen> createState() =>
@@ -1188,23 +1229,171 @@ class _PurchaseOrderArticleQuantityScreenState
     extends State<_PurchaseOrderArticleQuantityScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _quantityController;
+  final Map<int, TextEditingController> _packagingControllers =
+      <int, TextEditingController>{};
   late final NumberFormat _currencyFormat;
+  late SupplierArticleDto _article;
+  bool _isLoadingArticleDetail = false;
+
+  List<SupplierArticlePackagingLevelDto> get _packagingLevels =>
+      _article.packagingLevels
+          .where((level) => level.baseQuantityTotal > 0)
+          .toList(growable: true)
+        ..sort((left, right) => left.sortOrder.compareTo(right.sortOrder));
+
+  List<SupplierArticlePackagingLevelDto> get _additionalPackagingLevels =>
+      _packagingLevels.where((level) => !level.isBase).toList(growable: false);
 
   @override
   void initState() {
     super.initState();
+    _article = widget.article;
+    debugPrint(
+      '[po-quantity] init article=${_article.id} '
+      'referenceId=${_article.referenceId} '
+      'name="${_article.name}" '
+      'unit=${_article.unitOfMeasureId}/${_article.unitName} '
+      'catalogPackagingPath=${_article.packagingPath ?? ""} '
+      'catalogPackagingLevels=${_article.packagingLevels.length}',
+    );
     _quantityController = TextEditingController();
+    _syncPackagingControllers();
     _currencyFormat = NumberFormat.currency(
       locale: 'hr_HR',
       symbol: 'EUR ',
       decimalDigits: 2,
     );
+    _loadArticleDetailIfNeeded();
   }
 
   @override
   void dispose() {
     _quantityController.dispose();
+    for (final controller in _packagingControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
+  }
+
+  void _syncPackagingControllers() {
+    debugPrint(
+      '[po-quantity] sync packaging controllers: '
+      'article=${_article.id} '
+      'referenceId=${_article.referenceId} '
+      'levels=${_additionalPackagingLevels.map((level) => "${level.storageKey}:${level.displayName}:${level.baseQuantityTotal}").join(", ")}',
+    );
+    final activeIds = _additionalPackagingLevels
+        .map((level) => level.storageKey)
+        .toSet();
+    final staleIds = _packagingControllers.keys
+        .where((unitId) => !activeIds.contains(unitId))
+        .toList(growable: false);
+    for (final unitId in staleIds) {
+      _packagingControllers.remove(unitId)?.dispose();
+    }
+    for (final level in _additionalPackagingLevels) {
+      _packagingControllers.putIfAbsent(
+        level.storageKey,
+        () => TextEditingController(),
+      );
+    }
+  }
+
+  Future<void> _loadArticleDetailIfNeeded() async {
+    if (_article.packagingLevels.isNotEmpty ||
+        ((_article.packagingPath ?? '').trim().isNotEmpty)) {
+      debugPrint(
+        '[po-quantity] skip detail enrichment: article=${_article.id} '
+        'referenceId=${_article.referenceId} '
+        'packagingPathPresent=${((_article.packagingPath ?? "").trim().isNotEmpty)} '
+        'packagingLevels=${_article.packagingLevels.length}',
+      );
+      return;
+    }
+    debugPrint(
+      '[po-quantity] fetch detail enrichment: article=${_article.id} '
+      'referenceId=${_article.referenceId}',
+    );
+    setState(() {
+      _isLoadingArticleDetail = true;
+    });
+    try {
+      final detail = await widget.repository.fetchArticleDetail(
+        articleId: _article.referenceId,
+        authToken: widget.authToken,
+      );
+      if (!mounted) {
+        return;
+      }
+      debugPrint(
+        '[po-quantity] detail loaded: article=${detail.id} '
+        'referenceId=${detail.referenceId} '
+        'name="${detail.name}" '
+        'detailPackagingPath=${detail.packagingPath ?? ""} '
+        'detailPackagingLevels=${detail.packagingLevels.length} '
+        'detailLevels=${detail.packagingLevels.map((level) => "${level.sortOrder}:${level.storageKey}:${level.displayName}:base=${level.isBase}:qty=${level.baseQuantityTotal}").join(", ")}',
+      );
+      setState(() {
+        _article = _article.copyWith(
+          name: detail.name.isEmpty ? _article.name : detail.name,
+          unitOfMeasureId: detail.unitOfMeasureId == 0
+              ? _article.unitOfMeasureId
+              : detail.unitOfMeasureId,
+          unitName: detail.unitName.isEmpty ? _article.unitName : detail.unitName,
+          thumbnailUrl: detail.thumbnailUrl ?? _article.thumbnailUrl,
+          categoryId: detail.categoryId ?? _article.categoryId,
+          categoryName: detail.categoryName ?? _article.categoryName,
+          categorySortOrder:
+              detail.categorySortOrder ?? _article.categorySortOrder,
+          categoryPath: detail.categoryPath.isEmpty
+              ? _article.categoryPath
+              : detail.categoryPath,
+          packagingPath: detail.packagingPath ?? _article.packagingPath,
+          packagingLevels: detail.packagingLevels.isEmpty
+              ? _article.packagingLevels
+              : detail.packagingLevels,
+        );
+        _syncPackagingControllers();
+        _isLoadingArticleDetail = false;
+      });
+      debugPrint(
+        '[po-quantity] detail merged: article=${_article.id} '
+        'referenceId=${_article.referenceId} '
+        'mergedPackagingPath=${_article.packagingPath ?? ""} '
+        'mergedPackagingLevels=${_article.packagingLevels.length} '
+        'renderedAdditionalLevels=${_additionalPackagingLevels.length}',
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      debugPrint(
+        '[po-quantity] detail enrichment failed: article=${_article.id} '
+        'referenceId=${_article.referenceId} '
+        'error=$error',
+      );
+      setState(() {
+        _isLoadingArticleDetail = false;
+      });
+    }
+  }
+
+  void _recalculateBaseQuantityFromPackaging() {
+    var total = 0.0;
+    for (final level in _additionalPackagingLevels) {
+      final controller = _packagingControllers[level.storageKey];
+      final parsed = _parseLocalizedDecimal(controller?.text ?? '');
+      if (parsed == null || parsed <= 0) {
+        continue;
+      }
+      total += parsed * level.baseQuantityTotal;
+    }
+    _quantityController.value = TextEditingValue(
+      text: total <= 0 ? '' : _formatQuantityValue(total),
+      selection: TextSelection.collapsed(
+        offset: total <= 0 ? 0 : _formatQuantityValue(total).length,
+      ),
+    );
   }
 
   void _submit() {
@@ -1213,17 +1402,29 @@ class _PurchaseOrderArticleQuantityScreenState
     }
     Navigator.of(context).pop(
       _EditableOrderLine.fromSupplierArticle(
-        widget.article,
+        _article,
         quantityText: _quantityController.text,
+        packagingQuantities: {
+          for (final level in _additionalPackagingLevels)
+            if ((_packagingControllers[level.storageKey]?.text.trim() ?? '')
+                .isNotEmpty)
+              level.storageKey:
+                  _packagingControllers[level.storageKey]!.text.trim(),
+        },
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final article = widget.article;
-    final categoryName = _resolveArticleCategoryName(article);
-    final breadcrumb = _buildArticleBreadcrumb(article);
+    final article = _article;
+    debugPrint(
+      '[po-quantity] build: article=${article.id} '
+      'referenceId=${article.referenceId} '
+      'packagingPath=${article.packagingPath ?? ""} '
+      'allPackagingLevels=${_packagingLevels.length} '
+      'additionalPackagingLevels=${_additionalPackagingLevels.length}',
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Kolicina')),
@@ -1239,19 +1440,22 @@ class _PurchaseOrderArticleQuantityScreenState
               ),
               const SizedBox(height: 18),
               Text(article.name, style: Theme.of(context).textTheme.titleLarge),
-              if (categoryName.isNotEmpty) ...[
+              if ((article.packagingPath ?? '').trim().isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Text(categoryName),
-              ],
-              if (breadcrumb.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(breadcrumb, style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  article.packagingPath!.trim(),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ],
               const SizedBox(height: 8),
               Text(
                 _currencyFormat.format(article.defaultPrice),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
+              if (_isLoadingArticleDetail) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(),
+              ],
               const SizedBox(height: 16),
               TextFormField(
                 key: const Key('po-catalog-quantity'),
@@ -1272,6 +1476,27 @@ class _PurchaseOrderArticleQuantityScreenState
                   return null;
                 },
               ),
+              if (_additionalPackagingLevels.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ..._additionalPackagingLevels.map(
+                  (level) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: TextFormField(
+                      key: Key(
+                        'po-catalog-packaging-${level.storageKey}',
+                      ),
+                      controller: _packagingControllers[level.storageKey],
+                      decoration: InputDecoration(
+                        labelText: 'Broj pakiranja (${level.displayName})',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      onChanged: (_) => _recalculateBaseQuantityFromPackaging(),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
               FilledButton(
                 key: const Key('po-catalog-submit'),
@@ -1291,12 +1516,14 @@ class _ArticleCatalogCard extends StatelessWidget {
     required this.article,
     required this.repository,
     this.orderedQuantity = 0,
+    this.orderedSummaryLines = const <String>[],
     this.onTap,
   });
 
   final SupplierArticleDto article;
   final PurchaseOrderRepository repository;
   final double orderedQuantity;
+  final List<String> orderedSummaryLines;
   final VoidCallback? onTap;
 
   @override
@@ -1350,8 +1577,10 @@ class _ArticleCatalogCard extends StatelessWidget {
                     if (orderedQuantity > 0) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'Naruceno: ${_formatQuantityValue(orderedQuantity)} ${article.unitName}'
-                            .trim(),
+                        orderedSummaryLines.isEmpty
+                            ? 'Naruceno: ${_formatQuantityValue(orderedQuantity)} ${article.unitName}'
+                                  .trim()
+                            : 'Naruceno:\n${orderedSummaryLines.join('\n')}',
                         key: Key('po-catalog-ordered-${article.id}'),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w700,
@@ -1526,6 +1755,7 @@ class _EditableOrderLineCardState extends State<_EditableOrderLineCard> {
     return <SupplierArticleDto>[
       SupplierArticleDto(
         id: widget.line.articleId,
+        referenceId: widget.line.articleId,
         name: widget.line.articleName.isEmpty
             ? 'Nepoznati artikl'
             : '${widget.line.articleName} (vise nije u katalogu)',
@@ -1703,6 +1933,8 @@ class _EditableOrderLine {
     required this.priceText,
     required this.vatRate,
     required this.depositAmount,
+    this.packagingQuantities = const <int, String>{},
+    this.packagingLabels = const <int, String>{},
   });
 
   final int? id;
@@ -1714,6 +1946,8 @@ class _EditableOrderLine {
   final String priceText;
   final double vatRate;
   final double depositAmount;
+  final Map<int, String> packagingQuantities;
+  final Map<int, String> packagingLabels;
 
   double? get parsedQuantity => _parseLocalizedDecimal(quantityText);
 
@@ -1743,6 +1977,8 @@ class _EditableOrderLine {
     String? priceText,
     double? vatRate,
     double? depositAmount,
+    Map<int, String>? packagingQuantities,
+    Map<int, String>? packagingLabels,
   }) {
     return _EditableOrderLine(
       id: id ?? this.id,
@@ -1754,6 +1990,8 @@ class _EditableOrderLine {
       priceText: priceText ?? this.priceText,
       vatRate: vatRate ?? this.vatRate,
       depositAmount: depositAmount ?? this.depositAmount,
+      packagingQuantities: packagingQuantities ?? this.packagingQuantities,
+      packagingLabels: packagingLabels ?? this.packagingLabels,
     );
   }
 
@@ -1781,12 +2019,15 @@ class _EditableOrderLine {
       priceText: line.unitPrice == 0 ? '' : line.unitPrice.toStringAsFixed(2),
       vatRate: 0,
       depositAmount: 0,
+      packagingQuantities: const <int, String>{},
+      packagingLabels: const <int, String>{},
     );
   }
 
   factory _EditableOrderLine.fromSupplierArticle(
     SupplierArticleDto article, {
     required String quantityText,
+    Map<int, String> packagingQuantities = const <int, String>{},
   }) {
     return _EditableOrderLine(
       id: null,
@@ -1800,6 +2041,12 @@ class _EditableOrderLine {
           : article.defaultPrice.toStringAsFixed(2),
       vatRate: article.vatRate,
       depositAmount: article.depositAmount,
+      packagingQuantities: Map<int, String>.from(packagingQuantities),
+      packagingLabels: {
+        for (final level in article.packagingLevels)
+          if (!level.isBase)
+            level.storageKey: level.displayName,
+      },
     );
   }
 }
@@ -1843,6 +2090,7 @@ class _EditableOrderLineSnapshot {
     required this.price,
     required this.vatRate,
     required this.depositAmount,
+    required this.packagingQuantities,
   });
 
   final int? id;
@@ -1852,6 +2100,7 @@ class _EditableOrderLineSnapshot {
   final String price;
   final double vatRate;
   final double depositAmount;
+  final Map<int, String> packagingQuantities;
 
   factory _EditableOrderLineSnapshot.fromLine(_EditableOrderLine line) {
     return _EditableOrderLineSnapshot(
@@ -1862,6 +2111,7 @@ class _EditableOrderLineSnapshot {
       price: _normalizeDecimalString(line.priceText),
       vatRate: line.vatRate,
       depositAmount: line.depositAmount,
+      packagingQuantities: _normalizePackagingQuantities(line.packagingQuantities),
     );
   }
 
@@ -1877,7 +2127,8 @@ class _EditableOrderLineSnapshot {
         other.quantity == quantity &&
         other.price == price &&
         other.vatRate == vatRate &&
-        other.depositAmount == depositAmount;
+        other.depositAmount == depositAmount &&
+        _mapEquals(other.packagingQuantities, packagingQuantities);
   }
 
   @override
@@ -1889,6 +2140,7 @@ class _EditableOrderLineSnapshot {
     price,
     vatRate,
     depositAmount,
+    _mapHash(packagingQuantities),
   );
 }
 
@@ -2043,6 +2295,14 @@ List<_EditableOrderLine> _mergeDraftCatalogLine(
       priceText: incoming.priceText,
       vatRate: incoming.vatRate,
       depositAmount: incoming.depositAmount,
+      packagingQuantities: _mergePackagingQuantities(
+        existing.packagingQuantities,
+        incoming.packagingQuantities,
+      ),
+      packagingLabels: {
+        ...existing.packagingLabels,
+        ...incoming.packagingLabels,
+      },
     );
     return merged;
   }
@@ -2085,6 +2345,60 @@ String _formatQuantityValue(double value) {
       .replaceFirst(RegExp(r'\.$'), '');
 }
 
+String _formatOrderedBaseUnitLabel(String label, double quantity) {
+  final normalized = label.trim().toLowerCase();
+  if (normalized == 'komad' && quantity != 1) {
+    return 'komada';
+  }
+  return normalized;
+}
+
+Map<int, String> _normalizePackagingQuantities(Map<int, String> values) {
+  final normalizedEntries = values.entries
+      .where((entry) => _normalizeDecimalString(entry.value).isNotEmpty)
+      .map(
+        (entry) => MapEntry(
+          entry.key,
+          _normalizeDecimalString(entry.value),
+        ),
+      )
+      .toList(growable: true)
+    ..sort((left, right) => left.key.compareTo(right.key));
+  return Map<int, String>.fromEntries(normalizedEntries);
+}
+
+Map<int, String> _mergePackagingQuantities(
+  Map<int, String> left,
+  Map<int, String> right,
+) {
+  if (left.isEmpty) {
+    return _normalizePackagingQuantities(right);
+  }
+  if (right.isEmpty) {
+    return _normalizePackagingQuantities(left);
+  }
+  final merged = <int, double>{};
+  for (final entry in left.entries) {
+    final parsed = _parseLocalizedDecimal(entry.value);
+    if (parsed == null || parsed <= 0) {
+      continue;
+    }
+    merged[entry.key] = parsed;
+  }
+  for (final entry in right.entries) {
+    final parsed = _parseLocalizedDecimal(entry.value);
+    if (parsed == null || parsed <= 0) {
+      continue;
+    }
+    merged.update(entry.key, (current) => current + parsed, ifAbsent: () => parsed);
+  }
+  final normalizedEntries = merged.entries
+      .map((entry) => MapEntry(entry.key, _formatQuantityValue(entry.value)))
+      .toList(growable: true)
+    ..sort((leftEntry, rightEntry) => leftEntry.key.compareTo(rightEntry.key));
+  return Map<int, String>.fromEntries(normalizedEntries);
+}
+
 bool _listEquals<T>(List<T> left, List<T> right) {
   if (left.length != right.length) {
     return false;
@@ -2097,26 +2411,26 @@ bool _listEquals<T>(List<T> left, List<T> right) {
   return true;
 }
 
+bool _mapEquals<K, V>(Map<K, V> left, Map<K, V> right) {
+  if (left.length != right.length) {
+    return false;
+  }
+  for (final entry in left.entries) {
+    if (right[entry.key] != entry.value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+int _mapHash<K, V>(Map<K, V> map) {
+  final entries = map.entries.toList(growable: false)
+    ..sort((left, right) => left.key.hashCode.compareTo(right.key.hashCode));
+  return Object.hashAll(entries.map((entry) => Object.hash(entry.key, entry.value)));
+}
+
 String _normalizeSupplierName(String value) {
   return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-}
-
-String _resolveArticleCategoryName(SupplierArticleDto article) {
-  final categoryName = article.categoryName?.trim();
-  if (categoryName != null && categoryName.isNotEmpty) {
-    return categoryName;
-  }
-  if (article.categoryPath.isNotEmpty) {
-    return article.categoryPath.last;
-  }
-  return 'Ostalo';
-}
-
-String _buildArticleBreadcrumb(SupplierArticleDto article) {
-  if (article.categoryPath.length <= 1) {
-    return '';
-  }
-  return article.categoryPath.take(article.categoryPath.length - 1).join(' / ');
 }
 
 String _resolveArticleGroupTitle(SupplierArticleDto article) {
