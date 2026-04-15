@@ -6,6 +6,10 @@ abstract class AuthStorage {
   Future<String?> readToken();
 
   Future<void> clearToken();
+
+  Future<void> saveBaseUrl(String baseUrl);
+
+  Future<String?> readBaseUrl();
 }
 
 abstract class SecureKeyValueStore {
@@ -55,6 +59,7 @@ class SecureAuthStorage implements AuthStorage {
   }) : _store = store ?? FlutterSecureKeyValueStore();
 
   static const String tokenKey = 'mozart_auth_token';
+  static const String baseUrlKey = 'mozart_api_base_url';
 
   final SecureKeyValueStore _store;
 
@@ -64,8 +69,18 @@ class SecureAuthStorage implements AuthStorage {
   }
 
   @override
+  Future<String?> readBaseUrl() {
+    return _store.read(key: baseUrlKey);
+  }
+
+  @override
   Future<String?> readToken() {
     return _store.read(key: tokenKey);
+  }
+
+  @override
+  Future<void> saveBaseUrl(String baseUrl) {
+    return _store.write(key: baseUrlKey, value: baseUrl);
   }
 
   @override
@@ -76,6 +91,7 @@ class SecureAuthStorage implements AuthStorage {
 
 class InMemoryAuthStorage implements AuthStorage {
   String? _token;
+  String? _baseUrl;
 
   @override
   Future<void> clearToken() async {
@@ -84,6 +100,14 @@ class InMemoryAuthStorage implements AuthStorage {
 
   @override
   Future<String?> readToken() async => _token;
+
+  @override
+  Future<String?> readBaseUrl() async => _baseUrl;
+
+  @override
+  Future<void> saveBaseUrl(String baseUrl) async {
+    _baseUrl = baseUrl;
+  }
 
   @override
   Future<void> saveToken(String token) async {

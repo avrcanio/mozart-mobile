@@ -6,17 +6,24 @@ typedef JsonMap = Map<String, dynamic>;
 
 class ApiClient {
   ApiClient({
-    this.baseUrl = const String.fromEnvironment(
+    String baseUrl = const String.fromEnvironment(
       'MOZART_API_BASE_URL',
       defaultValue: 'https://mozart.sibenik1983.hr',
     ),
     this.requestTimeout = const Duration(seconds: 15),
     ApiTransport? transport,
-  }) : _transport = transport ?? HttpApiTransport();
+  })  : _baseUrl = baseUrl,
+        _transport = transport ?? HttpApiTransport();
 
-  final String baseUrl;
   final Duration requestTimeout;
   final ApiTransport _transport;
+  String _baseUrl;
+
+  String get baseUrl => _baseUrl;
+
+  void setBaseUrl(String value) {
+    _baseUrl = value.trim();
+  }
 
   Future<JsonMap> getJson(
     String path, {

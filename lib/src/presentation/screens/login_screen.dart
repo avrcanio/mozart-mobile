@@ -136,6 +136,26 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 20),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: widget.state.isLoading
+                                      ? null
+                                      : () {
+                                          controller.clearServer();
+                                        },
+                                  child: const Text('Promijeni server'),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (widget.state.apiBaseUrl.trim().isNotEmpty)
+                                Text(
+                                  widget.state.apiBaseUrl,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
