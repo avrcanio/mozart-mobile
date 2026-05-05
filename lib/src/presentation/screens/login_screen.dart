@@ -87,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
-                                  'Pristupite narudÅ¾bama, porukama i dnevnim zadacima na jednom mjestu.',
+                                  'Pristupite narudžbama, porukama i dnevnim zadacima na jednom mjestu.',
                                   style: theme.textTheme.bodyLarge,
                                 ),
                                 const SizedBox(height: 28),
@@ -96,8 +96,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   autocorrect: false,
                                   textInputAction: TextInputAction.next,
                                   decoration: const InputDecoration(
-                                    labelText: 'KorisniÄko ime',
-                                    hintText: 'Unesite korisniÄko ime',
+                                    labelText: 'Korisničko ime',
+                                    hintText: 'Unesite korisničko ime',
                                   ),
                                 ),
                                 const SizedBox(height: 16),

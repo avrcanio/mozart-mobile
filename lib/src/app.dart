@@ -162,6 +162,16 @@ class _MozartMobileAppState extends State<MozartMobileApp> {
       return MaterialApp(
         theme: buildMozartTheme(),
         debugShowCheckedModeBanner: false,
+        locale: const Locale('hr', 'HR'),
+        supportedLocales: const [
+          Locale('hr', 'HR'),
+          Locale('en', 'US'),
+        ],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
@@ -179,7 +189,11 @@ class _MozartMobileAppState extends State<MozartMobileApp> {
             Locale('hr', 'HR'),
             Locale('en', 'US'),
           ],
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           home: AppView(
             hasConfiguredServer:
                 _currentServerUrl != null && _currentServerUrl!.isNotEmpty &&
