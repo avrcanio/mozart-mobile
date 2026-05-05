@@ -142,6 +142,44 @@ class ApiClient {
         queryParametersList: queryParametersList,
       );
 
+  Future<void> probeReachability({
+    String path = '/api/me/',
+  }) async {
+    final request = ApiRequest(
+      method: 'GET',
+      uri: _endpoint(path),
+      headers: _headers(),
+    );
+
+    try {
+      await _transport.send(request).timeout(requestTimeout);
+    } on SocketException {
+      throw ApiException(
+        'Veza s Mozart servisom trenutno nije dostupna. Pokusajte ponovno za nekoliko trenutaka.',
+        uri: request.uri,
+        isConnectivityIssue: true,
+      );
+    } on HandshakeException {
+      throw ApiException(
+        'Veza s Mozart servisom trenutno nije dostupna. Pokusajte ponovno za nekoliko trenutaka.',
+        uri: request.uri,
+        isConnectivityIssue: true,
+      );
+    } on HttpException {
+      throw ApiException(
+        'Veza s Mozart servisom trenutno nije dostupna. Pokusajte ponovno za nekoliko trenutaka.',
+        uri: request.uri,
+        isConnectivityIssue: true,
+      );
+    } on TimeoutException {
+      throw ApiException(
+        'Veza s Mozart servisom je prespora ili privremeno nedostupna. Pokusajte ponovno za nekoliko trenutaka.',
+        uri: request.uri,
+        isConnectivityIssue: true,
+      );
+    }
+  }
+
   Uri _endpoint(
     String path, {
     Map<String, String>? queryParameters,

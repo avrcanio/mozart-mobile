@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:ordino/src/core/theme/app_theme.dart';
+import 'package:ordino/src/data/app_config/app_config_storage.dart';
 import 'package:ordino/src/data/auth/auth_repository.dart';
 import 'package:ordino/src/data/auth/auth_storage.dart';
 import 'package:ordino/src/data/dashboard/dashboard_repository.dart';
@@ -41,6 +42,84 @@ void main() {
 
     expect(find.text('Ordino'), findsOneWidget);
     expect(find.text('Prijava'), findsOneWidget);
+  });
+
+  testWidgets('shows server setup before login when no server url is saved', (
+    tester,
+  ) async {
+    final harness = await _createHarness(
+      responses: const <String, _FakeResponse>{},
+      hasConfiguredServer: false,
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pump();
+
+    expect(find.text('Povezivanje sa serverom'), findsOneWidget);
+    expect(find.byKey(const Key('server-url-field')), findsOneWidget);
+    expect(find.text('Prijava'), findsNothing);
+  });
+
+  testWidgets('saving server url transitions from setup to login', (
+    tester,
+  ) async {
+    final configStorage = InMemoryAppConfigStorage();
+    late _Harness harness;
+    harness = await _createHarness(
+      responses: <String, dynamic>{
+        'GET /api/me/': const _FakeResponse(statusCode: 401, body: ''),
+      },
+      hasConfiguredServer: false,
+      appConfigStorage: configStorage,
+      onSubmitServerUrl: (value) async {
+        final normalized = normalizeApiBaseUrl(value);
+        await ApiClient(
+          baseUrl: normalized,
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/me/': const _FakeResponse(statusCode: 401, body: ''),
+          }),
+        ).probeReachability();
+        await configStorage.saveApiBaseUrl(normalized);
+        harness.setConfiguredServer(normalized);
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const Key('server-url-field')),
+      ' https://example.test/ ',
+    );
+    await tester.tap(find.byKey(const Key('server-url-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Prijava'), findsOneWidget);
+    expect(await configStorage.readApiBaseUrl(), 'https://example.test');
+  });
+
+  testWidgets('login screen can open server change flow', (tester) async {
+    final configStorage = InMemoryAppConfigStorage(
+      apiBaseUrl: 'https://example.test',
+    );
+    late _Harness harness;
+    harness = await _createHarness(
+      responses: const <String, _FakeResponse>{},
+      appConfigStorage: configStorage,
+      currentServerUrl: 'https://example.test',
+      onChangeServer: () {
+        harness.setHasConfiguredServer(false);
+      },
+    );
+
+    await tester.pumpWidget(harness.app);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('login-change-server')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('server-url-field')), findsOneWidget);
+    expect(find.text('https://example.test'), findsOneWidget);
   });
 
   testWidgets('boots into authenticated dashboard with restored session', (
@@ -1411,7 +1490,11 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
           baseUrl: 'https://example.test',
           transport: _FakeTransport(<String, dynamic>{
             'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
-              <String, dynamic>{'id': 1, 'name': 'Fructus d.o.o.'},
+              <String, dynamic>{
+                'id': 1,
+                'name': 'Fructus d.o.o.',
+                'default_payment_type': 5,
+              },
             ]),
             'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
               <String, dynamic>{'id': 4, 'name': 'Reprezentacija'},
@@ -1506,6 +1589,88 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
 
     expect(find.text('Gotovina'), findsWidgets);
   });
+
+  testWidgets(
+    'selecting supplier applies default payment type only when empty',
+    (tester) async {
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 1,
+                'name': 'Fructus d.o.o.',
+                'default_payment_type': 5,
+              },
+              <String, dynamic>{
+                'id': 2,
+                'name': 'Blue Harbor Supply',
+                'default_payment_type': 6,
+              },
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+              <String, dynamic>{'id': 6, 'name': 'Gotovina'},
+            ]),
+            'GET /api/suppliers/1/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+          }),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: const UserSession(
+              token: 'token',
+              username: 'root',
+              fullName: 'Root User',
+              email: 'root@mozart.local',
+            ),
+            repository: repository,
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Fructus',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fructus d.o.o.').last);
+      await tester.pumpAndSettle();
+
+      final firstDropdown = tester.widget<DropdownButtonFormField<int>>(
+        find.byKey(const Key('po-form-payment-type')),
+      );
+      expect(firstDropdown.initialValue, 5);
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gotovina').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      final secondDropdown = tester.widget<DropdownButtonFormField<int>>(
+        find.byKey(const Key('po-form-payment-type')),
+      );
+      expect(secondDropdown.initialValue, 6);
+    },
+  );
 
   testWidgets('renders purchase order detail summary and line items', (
     tester,
@@ -2161,6 +2326,18 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             },
           ],
         ),
+        'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+            _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 77,
+                'artikl_name': 'Coffee beans',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.50',
+                'category_name': 'Zrna',
+                'category_path': <String>['Kava', 'Zrna'],
+              },
+            ]),
         'POST /api/purchase-orders/': _jsonResponse(<String, dynamic>{
           'id': 91,
           'reference': 'PO-NEW',
@@ -2254,13 +2431,30 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.tap(find.text('Dodaj stavku'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const Key('po-line-0-quantity')), '1');
+    await tester.tap(find.byKey(const Key('po-catalog-article-77')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('po-catalog-quantity')), '1');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('po-catalog-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('po-catalog-list')), findsOneWidget);
+    tester
+        .widget<BackButton>(find.byKey(const Key('po-catalog-back')))
+        .onPressed!
+        .call();
+    await tester.pumpAndSettle();
+
     await tester.scrollUntilVisible(
       find.byKey(const Key('po-form-save')),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.byKey(const Key('po-form-save')));
+    final saveButton = tester.widget<FilledButton>(
+      find.byKey(const Key('po-form-save')),
+    );
+    saveButton.onPressed!.call();
     await tester.pumpAndSettle();
 
     expect(find.textContaining('PO-FILTERED'), findsOneWidget);
@@ -2690,6 +2884,18 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
               },
             ],
           ),
+          'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+              _jsonListResponse(<Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 77,
+                  'artikl_name': 'Coffee beans',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kg',
+                  'price': '12.50',
+                  'category_name': 'Zrna',
+                  'category_path': <String>['Kava', 'Zrna'],
+                },
+              ]),
         }),
       ),
     );
@@ -4056,7 +4262,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
                 },
               ],
             ),
-          'PATCH /api/purchase-orders/44/': (ApiRequest request) {
+            'PATCH /api/purchase-orders/44/': (ApiRequest request) {
               capturedRequest = request;
               return _jsonResponse(<String, dynamic>{
                 'id': 44,
@@ -4214,135 +4420,137 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     expect(supplierField.controller!.text, 'Blue Harbor Supply');
   });
 
-  testWidgets(
-    'preserves selected supplier when editing only payment type',
-    (tester) async {
-      ApiRequest? capturedRequest;
-      final repository = PurchaseOrderRepository(
-        apiClient: ApiClient(
-          baseUrl: 'https://example.test',
-          transport: _FakeTransport(<String, dynamic>{
-            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
-              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
-            ]),
-            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
-              <String, dynamic>{'id': 5, 'name': 'Virman'},
-              <String, dynamic>{'id': 6, 'name': 'Gotovina'},
-            ]),
-            'GET /api/suppliers/2/artikli/': _jsonListResponse(
-              <Map<String, dynamic>>[
+  testWidgets('preserves selected supplier when editing only payment type', (
+    tester,
+  ) async {
+    ApiRequest? capturedRequest;
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+          ]),
+          'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 5, 'name': 'Virman'},
+            <String, dynamic>{'id': 6, 'name': 'Gotovina'},
+          ]),
+          'GET /api/suppliers/2/artikli/': _jsonListResponse(
+            <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 77,
+                'artikl_name': 'Coffee beans',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '13.00',
+              },
+            ],
+          ),
+          'PATCH /api/purchase-orders/44/': (ApiRequest request) {
+            capturedRequest = request;
+            return _jsonResponse(<String, dynamic>{
+              'id': 44,
+              'reference': 'PO-EDIT',
+              'supplier': 2,
+              'supplier_name': 'Blue Harbor Supply',
+              'status': 'created',
+              'status_display': 'Kreirana',
+              'payment_type': 6,
+              'payment_type_name': 'Gotovina',
+              'ordered_at': '2026-04-05T09:30:00Z',
+              'total_gross': '130.00',
+              'items': <Map<String, dynamic>>[
                 <String, dynamic>{
-                  'id': 77,
+                  'id': 7,
+                  'artikl': 77,
                   'artikl_name': 'Coffee beans',
+                  'quantity': '4.0000',
                   'unit_of_measure': 1,
                   'unit_name': 'kg',
                   'price': '13.00',
+                  'received_quantity': '0.0000',
+                  'remaining_quantity': '4.0000',
+                  'base_group': '',
                 },
               ],
-            ),
-            'PATCH /api/purchase-orders/44/': (ApiRequest request) {
-              capturedRequest = request;
-              return _jsonResponse(<String, dynamic>{
-                'id': 44,
-                'reference': 'PO-EDIT',
-                'supplier': 2,
-                'supplier_name': 'Blue Harbor Supply',
-                'status': 'created',
-                'status_display': 'Kreirana',
-                'payment_type': 6,
-                'payment_type_name': 'Gotovina',
-                'ordered_at': '2026-04-05T09:30:00Z',
-                'total_gross': '130.00',
-                'items': <Map<String, dynamic>>[
-                  <String, dynamic>{
-                    'id': 7,
-                    'artikl': 77,
-                    'artikl_name': 'Coffee beans',
-                    'quantity': '4.0000',
-                    'unit_of_measure': 1,
-                    'unit_name': 'kg',
-                    'price': '13.00',
-                    'received_quantity': '0.0000',
-                    'remaining_quantity': '4.0000',
-                    'base_group': '',
-                  },
-                ],
-              });
-            },
-          }),
+            });
+          },
+        }),
+      ),
+    );
+
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+
+    const initialOrder = PurchaseOrder(
+      id: 44,
+      reference: 'PO-EDIT',
+      supplierId: 2,
+      status: 'created',
+      statusLabel: 'Kreirana',
+      supplierName: 'Blue Harbor Supply',
+      paymentTypeId: 5,
+      paymentTypeName: 'Virman',
+      totalAmount: 130,
+      currency: 'EUR',
+      orderedAt: null,
+      lines: <PurchaseOrderLine>[
+        PurchaseOrderLine(
+          id: 7,
+          articleId: 77,
+          articleName: 'Coffee beans',
+          unitOfMeasureId: 1,
+          unitName: 'kg',
+          baseGroup: '',
+          quantity: 4,
+          receivedQuantity: 0,
+          remainingQuantity: 4,
+          unitPrice: 13,
         ),
-      );
+      ],
+    );
 
-      const session = UserSession(
-        token: 'saved-token',
-        username: 'root',
-        fullName: 'Mozart Operator',
-        email: 'root@mozart.local',
-      );
-
-      const initialOrder = PurchaseOrder(
-        id: 44,
-        reference: 'PO-EDIT',
-        supplierId: 2,
-        status: 'created',
-        statusLabel: 'Kreirana',
-        supplierName: 'Blue Harbor Supply',
-        paymentTypeId: 5,
-        paymentTypeName: 'Virman',
-        totalAmount: 130,
-        currency: 'EUR',
-        orderedAt: null,
-        lines: <PurchaseOrderLine>[
-          PurchaseOrderLine(
-            id: 7,
-            articleId: 77,
-            articleName: 'Coffee beans',
-            unitOfMeasureId: 1,
-            unitName: 'kg',
-            baseGroup: '',
-            quantity: 4,
-            receivedQuantity: 0,
-            remainingQuantity: 4,
-            unitPrice: 13,
-          ),
-        ],
-      );
-
-      await tester.pumpWidget(
-        _testMaterialApp(
-          home: PurchaseOrderFormScreen(
-            session: session,
-            repository: repository,
-            initialOrder: initialOrder,
-          ),
+    await tester.pumpWidget(
+      _testMaterialApp(
+        home: PurchaseOrderFormScreen(
+          session: session,
+          repository: repository,
+          initialOrder: initialOrder,
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('po-form-payment-type')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Gotovina').last);
-      await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('po-form-payment-type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gotovina').last);
+    await tester.pumpAndSettle();
 
-      final supplierField = tester.widget<TextFormField>(
-        find.byKey(const Key('po-form-supplier')),
-      );
-      expect(supplierField.controller!.text, 'Blue Harbor Supply');
+    final supplierField = tester.widget<TextFormField>(
+      find.byKey(const Key('po-form-supplier')),
+    );
+    expect(supplierField.controller!.text, 'Blue Harbor Supply');
 
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('po-form-save')),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.byKey(const Key('po-form-save')));
-      await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('po-form-save')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    final saveButton = tester.widget<FilledButton>(
+      find.byKey(const Key('po-form-save')),
+    );
+    saveButton.onPressed!.call();
+    await tester.pumpAndSettle();
 
-      final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
-      expect(body['supplier'], 2);
-      expect(body['payment_type'], 6);
-      expect(find.textContaining('supplier:'), findsNothing);
-    },
-  );
+    final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+    expect(body['supplier'], 2);
+    expect(body['payment_type'], 6);
+    expect(find.textContaining('supplier:'), findsNothing);
+  });
 
   testWidgets(
     'preserves initial supplier outside lookup list when editing purchase order',
@@ -4456,7 +4664,10 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.byKey(const Key('po-form-save')));
+      final saveButton = tester.widget<FilledButton>(
+        find.byKey(const Key('po-form-save')),
+      );
+      saveButton.onPressed!.call();
       await tester.pumpAndSettle();
 
       final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
@@ -4474,7 +4685,10 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
           baseUrl: 'https://example.test',
           transport: _FakeTransport(<String, dynamic>{
             'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
-              <String, dynamic>{'id': 2, 'name': 'Koktel Ugostiteljstvo d.o.o.'},
+              <String, dynamic>{
+                'id': 2,
+                'name': 'Koktel Ugostiteljstvo d.o.o.',
+              },
             ]),
             'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
               <String, dynamic>{'id': 5, 'name': 'American'},
@@ -4580,7 +4794,10 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.byKey(const Key('po-form-save')));
+      final saveButton = tester.widget<FilledButton>(
+        find.byKey(const Key('po-form-save')),
+      );
+      saveButton.onPressed!.call();
       await tester.pumpAndSettle();
 
       final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
@@ -4718,7 +4935,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
       apiClient: ApiClient(
         baseUrl: 'https://example.test',
         transport: _FakeTransport(<String, dynamic>{
-            'PATCH /api/purchase-orders/44/': (ApiRequest request) {
+          'PATCH /api/purchase-orders/44/': (ApiRequest request) {
             capturedRequest = request;
             return _jsonResponse(<String, dynamic>{
               'id': 44,
@@ -5047,20 +5264,1265 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     await tester.tap(find.text('Dodaj stavku'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const Key('po-line-0-quantity')), '1,5');
-    await tester.enterText(find.byKey(const Key('po-line-0-price')), '12,50');
+    await tester.tap(find.byKey(const Key('po-catalog-article-77')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('po-catalog-quantity')), '1,5');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('po-catalog-submit')));
+    await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('po-catalog-list')), findsOneWidget);
+    tester
+        .widget<BackButton>(find.byKey(const Key('po-catalog-back')))
+        .onPressed!
+        .call();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('po-line-0-price')), findsNothing);
     await tester.scrollUntilVisible(
       find.byKey(const Key('po-form-save')),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.byKey(const Key('po-form-save')));
+    final saveButton = tester.widget<FilledButton>(
+      find.byKey(const Key('po-form-save')),
+    );
+    saveButton.onPressed!.call();
     await tester.pumpAndSettle();
 
     final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
     expect((body['items'] as List).single['quantity'], '1.5');
     expect((body['items'] as List).single['price'], '12.50');
+  });
+
+  testWidgets(
+    'groups supplier catalog articles by category sort order with no category last',
+    (tester) async {
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 76,
+                    'artikl_name': 'Aperol',
+                    'unit_of_measure': 1,
+                    'unit_name': 'kom',
+                    'price': '9.99',
+                    'category_name': 'Aperitivi',
+                    'category_sort_order': 10,
+                    'category_path': <String>['Pica', 'Aperitivi'],
+                  },
+                  <String, dynamic>{
+                    'id': 77,
+                    'artikl_name': 'Cola',
+                    'unit_of_measure': 1,
+                    'unit_name': 'kom',
+                    'price': '2.50',
+                    'image_50x75': '/api/artikli/77/image-50x75/',
+                    'category_name': 'Sokovi',
+                    'category_sort_order': 20,
+                    'category_path': <String>[
+                      'Aperitivi',
+                      'Bezalkoholno',
+                      'Sokovi',
+                    ],
+                  },
+                  <String, dynamic>{
+                    'id': 78,
+                    'artikl_name': 'Fanta',
+                    'unit_of_measure': 1,
+                    'unit_name': 'kom',
+                    'price': '2.40',
+                    'category_name': 'Sokovi',
+                    'category_sort_order': 20,
+                    'category_path': <String>['Pica', 'Gazirano', 'Sokovi'],
+                  },
+                  <String, dynamic>{
+                    'id': 79,
+                    'artikl_name': 'Bez kategorije',
+                    'unit_of_measure': 1,
+                    'unit_name': 'kom',
+                    'price': '1.00',
+                  },
+                ]),
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('po-catalog-group-0')), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-group-1')), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-group-2')), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('po-catalog-group-0'))).data,
+        'Aperitivi',
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const Key('po-catalog-group-1'))).data,
+        'Sokovi',
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const Key('po-catalog-group-2'))).data,
+        'No category',
+      );
+      expect(find.byKey(const Key('po-catalog-prev-group')), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-next-group')), findsOneWidget);
+      expect(
+        tester
+            .widget<FloatingActionButton>(
+              find.byKey(const Key('po-catalog-prev-group')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<FloatingActionButton>(
+              find.byKey(const Key('po-catalog-next-group')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(
+        tester.getSize(find.byKey(const Key('po-catalog-thumbnail-77'))),
+        const Size(50, 75),
+      );
+      final image = tester.widget<Image>(
+        find.descendant(
+          of: find.byKey(const Key('po-catalog-thumbnail-77')),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(
+        (image.image as NetworkImage).url,
+        'https://example.test/api/artikli/77/image-50x75/',
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const Key('po-catalog-group-0'))).dy,
+        lessThan(
+          tester.getTopLeft(find.byKey(const Key('po-catalog-group-1'))).dy,
+        ),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const Key('po-catalog-group-1'))).dy,
+        lessThan(
+          tester.getTopLeft(find.byKey(const Key('po-catalog-group-2'))).dy,
+        ),
+      );
+      expect(
+        tester.getTopLeft(find.text('Aperol')).dy,
+        lessThan(tester.getTopLeft(find.text('Cola')).dy),
+      );
+      expect(find.text('Pica / Aperitivi'), findsNothing);
+      expect(find.text('Aperitivi / Bezalkoholno'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('po-catalog-next-group')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<FloatingActionButton>(
+              find.byKey(const Key('po-catalog-prev-group')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(
+        tester
+            .widget<FloatingActionButton>(
+              find.byKey(const Key('po-catalog-next-group')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await tester.tap(find.byKey(const Key('po-catalog-next-group')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<FloatingActionButton>(
+              find.byKey(const Key('po-catalog-next-group')),
+            )
+            .onPressed,
+        isNull,
+      );
+    },
+  );
+
+  testWidgets('category jump buttons still work after manual scroll', (
+    tester,
+  ) async {
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+          ]),
+          'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 5, 'name': 'Virman'},
+          ]),
+          'GET /api/suppliers/2/artikli/': _jsonListResponse(
+            <Map<String, dynamic>>[],
+          ),
+          'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+              _jsonListResponse(<Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 77,
+                  'artikl_name': 'Cola',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kom',
+                  'price': '2.50',
+                  'category_name': 'A kategorija',
+                  'category_sort_order': 30,
+                  'category_path': <String>[
+                    'Aperitivi',
+                    'Bezalkoholno',
+                    'Sokovi',
+                  ],
+                },
+                <String, dynamic>{
+                  'id': 78,
+                  'artikl_name': 'Mineralna',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kom',
+                  'price': '2.10',
+                  'category_name': 'B kategorija',
+                  'category_sort_order': 40,
+                  'category_path': <String>[
+                    'Bezalkoholna pica',
+                    'Sokovi',
+                    'Gazirani sokovi',
+                  ],
+                },
+                <String, dynamic>{
+                  'id': 79,
+                  'artikl_name': 'Treca',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kom',
+                  'price': '1.00',
+                  'category_name': 'C kategorija',
+                  'category_sort_order': 50,
+                },
+                <String, dynamic>{
+                  'id': 80,
+                  'artikl_name': 'Bez kategorije',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kom',
+                  'price': '1.00',
+                },
+              ]),
+        }),
+      ),
+    );
+
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+
+    await tester.pumpWidget(
+      _testMaterialApp(
+        home: PurchaseOrderFormScreen(session: session, repository: repository),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-form-supplier')),
+      'Blue Harbor',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Blue Harbor Supply').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-form-payment-type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Virman').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Dodaj stavku'));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const Key('po-catalog-list')),
+      const Offset(0, -420),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-catalog-prev-group')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('po-catalog-group-1'))).data,
+      'B kategorija',
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const Key('po-catalog-group-1'))).dy,
+      lessThanOrEqualTo(72),
+    );
+
+    await tester.tap(find.byKey(const Key('po-catalog-next-group')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('po-catalog-group-2'))).data,
+      'C kategorija',
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const Key('po-catalog-group-2'))).dy,
+      lessThanOrEqualTo(72),
+    );
+
+    await tester.tap(find.byKey(const Key('po-catalog-next-group')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('po-catalog-group-3'))).data,
+      'No category',
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const Key('po-catalog-group-3'))).dy,
+      lessThanOrEqualTo(72),
+    );
+  });
+
+  testWidgets(
+    'category jump buttons materialize deep groups in large catalogs',
+    (tester) async {
+      final categoryPayload = List<Map<String, dynamic>>.generate(22, (index) {
+        return <String, dynamic>{
+          'id': 200 + index,
+          'artikl_name': 'Artikl $index',
+          'unit_of_measure': 1,
+          'unit_name': 'kom',
+          'price': '1.00',
+          'category_name': 'Kategorija $index',
+          'category_sort_order': 1000 + index,
+        };
+      });
+
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 3,
+                'name': 'Koktel Ugostiteljstvo d.o.o.',
+              },
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/3/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/3/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(categoryPayload),
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Koktel',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Koktel Ugostiteljstvo d.o.o.').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-catalog-next-group')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const Key('po-catalog-group-1'))).data,
+        'Kategorija 1',
+      );
+
+      await tester.tap(find.byKey(const Key('po-catalog-next-group')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const Key('po-catalog-group-2'))).data,
+        'Kategorija 2',
+      );
+
+      await tester.tap(find.byKey(const Key('po-catalog-next-group')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const Key('po-catalog-group-3'))).data,
+        'Kategorija 3',
+      );
+
+      await tester.tap(find.byKey(const Key('po-catalog-next-group')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const Key('po-catalog-group-4'))).data,
+        'Kategorija 4',
+      );
+    },
+  );
+
+  testWidgets('locks ordered-at field after adding first line', (tester) async {
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+          ]),
+          'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 5, 'name': 'Virman'},
+          ]),
+          'GET /api/suppliers/2/artikli/': _jsonListResponse(
+            <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 77,
+                'artikl_name': 'Coffee beans',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.50',
+              },
+            ],
+          ),
+          'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+              _jsonListResponse(<Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 77,
+                  'artikl_name': 'Coffee beans',
+                  'unit_of_measure': 1,
+                  'unit_name': 'kg',
+                  'price': '12.50',
+                  'category_name': 'Zrna',
+                  'category_path': <String>['Kava', 'Zrna'],
+                },
+              ]),
+        }),
+      ),
+    );
+
+    const session = UserSession(
+      token: 'saved-token',
+      username: 'root',
+      fullName: 'Mozart Operator',
+      email: 'root@mozart.local',
+    );
+
+    await tester.pumpWidget(
+      _testMaterialApp(
+        home: PurchaseOrderFormScreen(session: session, repository: repository),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-form-supplier')),
+      'Blue Harbor',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Blue Harbor Supply').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('po-form-payment-type')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Virman').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Dodaj stavku'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('po-catalog-article-77')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('po-catalog-quantity')), '2');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('po-catalog-submit')));
+    await tester.pumpAndSettle();
+
+    tester
+        .widget<BackButton>(find.byKey(const Key('po-catalog-back')))
+        .onPressed!
+        .call();
+    await tester.pumpAndSettle();
+
+    final orderedAtField = tester.widget<TextFormField>(
+      find.byKey(const Key('po-form-ordered-at')),
+    );
+    expect(orderedAtField.enabled, isFalse);
+    expect(find.textContaining('Datum je zaklju'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows ordered quantities, stays in catalog after add, and renders draft totals',
+    (tester) async {
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 77,
+                    'artikl_name': 'Coca Cola 0.25',
+                    'unit_of_measure': 1,
+                    'unit_name': 'kom',
+                    'price': '2.80',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0.10,
+                    'category_name': 'Gazirani sokovi',
+                    'category_path': <String>[
+                      'Pica',
+                      'Bezalkoholna pica',
+                      'Gazirani sokovi',
+                    ],
+                  },
+                  <String, dynamic>{
+                    'id': 78,
+                    'artikl_name': 'Voda 0.5',
+                    'unit_of_measure': 1,
+                    'unit_name': 'kom',
+                    'price': '1.90',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0.00,
+                    'category_name': 'Voda',
+                    'category_path': <String>[
+                      'Pica',
+                      'Bezalkoholna pica',
+                      'Voda',
+                    ],
+                  },
+                ]),
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-catalog-article-77')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('po-catalog-quantity')), '2');
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('po-catalog-submit')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('po-catalog-list')), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-ordered-77')), findsOneWidget);
+      expect(find.textContaining('Naruceno: 2 kom'), findsOneWidget);
+      expect(
+        tester
+            .widget<Card>(
+              find
+                  .ancestor(
+                    of: find.byKey(const Key('po-catalog-ordered-77')),
+                    matching: find.byType(Card),
+                  )
+                  .first,
+            )
+            .color,
+        const Color(0xFFE4F5D8),
+      );
+
+      await tester.tap(find.byKey(const Key('po-catalog-article-77')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('po-catalog-quantity')), '1');
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('po-catalog-submit')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Naruceno: 3 kom'), findsOneWidget);
+
+      tester
+          .widget<BackButton>(find.byKey(const Key('po-catalog-back')))
+          .onPressed!
+          .call();
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Ukupni iznosi'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Ukupni iznosi'), findsOneWidget);
+      expect(find.text('Bez PDV'), findsOneWidget);
+      expect(find.text('PDV'), findsOneWidget);
+      expect(find.text('Povratna naknada'), findsOneWidget);
+      expect(find.text('Total sa PDV'), findsOneWidget);
+      expect(find.textContaining('8,4'), findsOneWidget);
+      expect(find.textContaining('2,1'), findsOneWidget);
+      expect(find.textContaining('0,3'), findsOneWidget);
+      expect(find.textContaining('10,8'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'supports packaging quantities and submits computed base quantity',
+    (tester) async {
+      ApiRequest? capturedRequest;
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 77,
+                    'artikl_name': 'Stella Artois pivo 0,33l',
+                    'unit_of_measure': 1,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0.10,
+                    'category_name': 'Svijetlo pivo',
+                    'packaging_path': 'komad -> 24/gajba -> 60/paleta',
+                    'packaging_levels': <Map<String, dynamic>>[
+                      <String, dynamic>{
+                        'id': 123,
+                        'sort_order': 0,
+                        'unit_of_measure': 1,
+                        'unit_name': 'Komad',
+                        'level_name': 'komad',
+                        'is_base': true,
+                        'base_quantity_total': 1,
+                        'contains_previous': null,
+                      },
+                      <String, dynamic>{
+                        'id': 124,
+                        'sort_order': 1,
+                        'unit_of_measure': 2,
+                        'unit_name': 'Gajba',
+                        'level_name': 'gajba',
+                        'is_base': false,
+                        'base_quantity_total': 24,
+                        'contains_previous': '24.0000',
+                      },
+                      <String, dynamic>{
+                        'id': 125,
+                        'sort_order': 2,
+                        'unit_of_measure': 3,
+                        'unit_name': 'Paleta',
+                        'level_name': 'paleta',
+                        'is_base': false,
+                        'base_quantity_total': 1440,
+                        'contains_previous': '60.0000',
+                      },
+                    ],
+                  },
+                ]),
+            'POST /api/purchase-orders/': (ApiRequest request) {
+              capturedRequest = request;
+              return _jsonResponse(<String, dynamic>{
+                'id': 91,
+                'reference': 'PO-PACK',
+                'supplier': 2,
+                'supplier_name': 'Blue Harbor Supply',
+                'status': 'created',
+                'status_display': 'Kreirana',
+                'payment_type': 5,
+                'payment_type_name': 'Virman',
+                'ordered_at': '2026-04-15T09:30:00Z',
+                'total_gross': '120.00',
+                'items': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 1,
+                    'artikl': 77,
+                    'artikl_name': 'Stella Artois pivo 0,33l',
+                    'quantity': '1488.0000',
+                    'unit_of_measure': 1,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                    'received_quantity': '0.0000',
+                    'remaining_quantity': '1488.0000',
+                    'base_group': '',
+                  },
+                ],
+              });
+            },
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-catalog-article-77')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('komad -> 24/gajba -> 60/paleta'), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-2')), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-3')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('po-catalog-packaging-2')),
+        '2',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('po-catalog-quantity')))
+            .controller!
+            .text,
+        '48',
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('po-catalog-packaging-3')),
+        '1',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const Key('po-catalog-quantity')))
+            .controller!
+            .text,
+        '1488',
+      );
+
+      await tester.tap(find.byKey(const Key('po-catalog-submit')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('po-catalog-ordered-77')), findsOneWidget);
+      expect(find.textContaining('Naruceno:'), findsOneWidget);
+      expect(find.textContaining('2 gajba'), findsOneWidget);
+      expect(find.textContaining('1 paleta'), findsOneWidget);
+      expect(find.textContaining('1488 komada'), findsOneWidget);
+
+      tester
+          .widget<BackButton>(find.byKey(const Key('po-catalog-back')))
+          .onPressed!
+          .call();
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('po-form-save')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('po-form-save')));
+      await tester.pumpAndSettle();
+
+      final body = jsonDecode(capturedRequest!.body!) as Map<String, dynamic>;
+      final items = body['items'] as List<dynamic>;
+      expect(items, hasLength(1));
+      expect((items.first as Map<String, dynamic>)['quantity'], '1488');
+    },
+  );
+
+  testWidgets(
+    'loads packaging levels from article detail when supplier catalog omits them',
+    (tester) async {
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 171,
+                    'rm_id': 651,
+                    'name': 'Stella Artois pivo 0,33l',
+                    'image_50x75': 'https://example.test/image-50x75.png',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0,
+                    'category_id': 66,
+                    'category_name': 'Svijetlo pivo',
+                    'category_sort_order': 3110,
+                    'unit_of_measure': 3,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                  },
+                ]),
+            'GET /api/artikli/651/': _jsonResponse(<String, dynamic>{
+              'rm_id': 651,
+              'name': 'Stella Artois pivo 0,33l',
+              'code': '3850131481011',
+              'image_50x75': 'https://example.test/image-50x75.png',
+              'vat_rate': 0.25,
+              'deposit_amount': 0,
+              'category_id': 66,
+              'category_name': 'Svijetlo pivo',
+              'category_sort_order': 3110,
+              'packaging_path': 'komad -> 24/gajba',
+              'packaging_levels': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 345,
+                  'sort_order': 0,
+                  'unit_of_measure': 3,
+                  'unit_name': 'Komad',
+                  'level_name': 'komad',
+                  'is_base': true,
+                  'base_quantity_total': 1,
+                  'contains_previous': null,
+                },
+                <String, dynamic>{
+                  'id': 440,
+                  'sort_order': 1,
+                  'unit_of_measure': 8,
+                  'unit_name': 'Gajba',
+                  'level_name': 'gajba',
+                  'is_base': false,
+                  'base_quantity_total': 24,
+                  'contains_previous': '24.0000',
+                },
+              ],
+            }),
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('po-catalog-article-171')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('komad -> 24/gajba'), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-8')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'derives article reference id from image url when supplier catalog omits rm_id',
+    (tester) async {
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 171,
+                    'name': 'Stella Artois pivo 0,33l',
+                    'image_50x75':
+                        'https://example.test/api/artikli/651/image-50x75/',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0,
+                    'category_name': 'Svijetlo pivo',
+                    'unit_of_measure': 3,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                  },
+                ]),
+            'GET /api/artikli/651/': _jsonResponse(<String, dynamic>{
+              'rm_id': 651,
+              'name': 'Stella Artois pivo 0,33l',
+              'packaging_path': 'komad -> 24/gajba',
+              'packaging_levels': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 345,
+                  'sort_order': 0,
+                  'unit_of_measure': 3,
+                  'unit_name': 'Komad',
+                  'level_name': 'komad',
+                  'is_base': true,
+                  'base_quantity_total': 1,
+                  'contains_previous': null,
+                },
+                <String, dynamic>{
+                  'id': 440,
+                  'sort_order': 1,
+                  'unit_of_measure': 8,
+                  'unit_name': 'Gajba',
+                  'level_name': 'gajba',
+                  'is_base': false,
+                  'base_quantity_total': 24,
+                  'contains_previous': '24.0000',
+                },
+              ],
+            }),
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('po-catalog-article-171')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('komad -> 24/gajba'), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-8')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'supports backend packaging detail with artikl_rm_id and minimal packaging level fields',
+    (tester) async {
+      final repository = PurchaseOrderRepository(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.test',
+          transport: _FakeTransport(<String, dynamic>{
+            'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            ]),
+            'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+              <String, dynamic>{'id': 5, 'name': 'Virman'},
+            ]),
+            'GET /api/suppliers/2/artikli/': _jsonListResponse(
+              <Map<String, dynamic>>[],
+            ),
+            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+                _jsonListResponse(<Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 171,
+                    'name': 'Stella Artois pivo 0,33l',
+                    'image_50x75':
+                        'https://example.test/api/artikli/651/image-50x75/',
+                    'vat_rate': 0.25,
+                    'deposit_amount': 0,
+                    'unit_of_measure': 3,
+                    'unit_name': 'Komad',
+                    'price': '1.16',
+                  },
+                ]),
+            'GET /api/artikli/651/': _jsonResponse(<String, dynamic>{
+              'artikl_rm_id': 651,
+              'name': 'Stella Artois pivo 0,33l',
+              'packaging_path': 'komad -> 24/gajba',
+              'packaging_levels': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'sort_order': 0,
+                  'unit_name': 'Komad',
+                  'level_name': 'komad',
+                  'base_quantity_total': 1,
+                },
+                <String, dynamic>{
+                  'sort_order': 1,
+                  'unit_name': 'Gajba',
+                  'level_name': 'gajba',
+                  'base_quantity_total': 24,
+                },
+              ],
+            }),
+          }),
+        ),
+      );
+
+      const session = UserSession(
+        token: 'saved-token',
+        username: 'root',
+        fullName: 'Mozart Operator',
+        email: 'root@mozart.local',
+      );
+
+      await tester.pumpWidget(
+        _testMaterialApp(
+          home: PurchaseOrderFormScreen(
+            session: session,
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('po-form-supplier')),
+        'Blue Harbor',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Blue Harbor Supply').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('po-form-payment-type')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Virman').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dodaj stavku'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('po-catalog-article-171')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('komad -> 24/gajba'), findsOneWidget);
+      expect(find.byKey(const Key('po-catalog-packaging-2')), findsOneWidget);
+    },
+  );
+
+  test('normalizes and validates runtime api base url', () {
+    expect(
+      normalizeApiBaseUrl(' https://example.test/ '),
+      'https://example.test',
+    );
+    expect(
+      normalizeApiBaseUrl('http://intranet.local'),
+      'http://intranet.local',
+    );
+    expect(() => normalizeApiBaseUrl(''), throwsA(isA<FormatException>()));
+    expect(
+      () => normalizeApiBaseUrl('example.test'),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('saved runtime url overrides fallback config', () {
+    expect(
+      resolveApiBaseUrl(
+        'https://saved.example',
+        fallbackUrl: 'https://fallback.example',
+      ),
+      'https://saved.example',
+    );
+    expect(
+      resolveApiBaseUrl(null, fallbackUrl: 'https://fallback.example'),
+      'https://fallback.example',
+    );
+    expect(
+      resolveApiBaseUrl('   ', fallbackUrl: 'https://fallback.example'),
+      'https://fallback.example',
+    );
+  });
+
+  test('reachability probe accepts non-success http responses', () async {
+    final client = ApiClient(
+      baseUrl: 'https://example.test',
+      transport: _FakeTransport(<String, dynamic>{
+        'GET /api/me/': const _FakeResponse(statusCode: 401, body: ''),
+      }),
+    );
+
+    await client.probeReachability();
+  });
+
+  test('reachability probe surfaces connectivity failures', () async {
+    final client = ApiClient(
+      baseUrl: 'https://example.test',
+      transport: _SocketFailureTransport(),
+    );
+
+    await expectLater(
+      client.probeReachability(),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.isConnectivityIssue,
+          'isConnectivityIssue',
+          true,
+        ),
+      ),
+    );
   });
 }
 
@@ -5068,6 +6530,11 @@ Future<_Harness> _createHarness({
   required Map<String, dynamic> responses,
   String? savedToken,
   Duration requestTimeout = const Duration(seconds: 15),
+  bool hasConfiguredServer = true,
+  String? currentServerUrl,
+  InMemoryAppConfigStorage? appConfigStorage,
+  Future<void> Function(String value)? onSubmitServerUrl,
+  VoidCallback? onChangeServer,
 }) async {
   final transport = _FakeTransport(responses);
   final apiClient = ApiClient(
@@ -5076,6 +6543,11 @@ Future<_Harness> _createHarness({
     requestTimeout: requestTimeout,
   );
   final storage = InMemoryAuthStorage();
+  final configStorage =
+      appConfigStorage ??
+      InMemoryAppConfigStorage(
+        apiBaseUrl: currentServerUrl ?? 'https://example.test',
+      );
   if (savedToken != null) {
     await storage.saveToken(savedToken);
   }
@@ -5089,7 +6561,18 @@ Future<_Harness> _createHarness({
   );
   final sessionController = SessionController(authRepository: authRepository)
     ..restore();
+  final appState = ValueNotifier<_HarnessAppState>(
+    _HarnessAppState(
+      hasConfiguredServer: hasConfiguredServer,
+      isConfigLoading: false,
+      currentServerUrl:
+          currentServerUrl ??
+          (hasConfiguredServer ? 'https://example.test' : null),
+      serverUrlErrorMessage: null,
+    ),
+  );
 
+  late final _Harness harness;
   final app = AppServicesScope(
     services: AppServices(
       dashboardRepository: dashboardRepository,
@@ -5098,11 +6581,46 @@ Future<_Harness> _createHarness({
     ),
     child: SessionScope(
       controller: sessionController,
-      child: _testMaterialApp(home: const AppView()),
+      child: ValueListenableBuilder<_HarnessAppState>(
+        valueListenable: appState,
+        builder: (context, state, _) {
+          return _testMaterialApp(
+            home: AppView(
+              hasConfiguredServer: state.hasConfiguredServer,
+              isConfigLoading: state.isConfigLoading,
+              currentServerUrl: state.currentServerUrl,
+              serverUrlErrorMessage: state.serverUrlErrorMessage,
+              onSubmitServerUrl: (value) async {
+                if (onSubmitServerUrl != null) {
+                  await onSubmitServerUrl(value);
+                  return;
+                }
+
+                final normalized = normalizeApiBaseUrl(value);
+                await configStorage.saveApiBaseUrl(normalized);
+                harness.setConfiguredServer(normalized);
+              },
+              onChangeServer:
+                  onChangeServer ??
+                  () {
+                    harness.setHasConfiguredServer(false);
+                  },
+            ),
+          );
+        },
+      ),
     ),
   );
 
-  return _Harness(app: app, controller: sessionController, storage: storage);
+  harness = _Harness(
+    app: app,
+    controller: sessionController,
+    storage: storage,
+    configStorage: configStorage,
+    appState: appState,
+  );
+
+  return harness;
 }
 
 _FakeResponse _jsonResponse(Map<String, dynamic> json) {
@@ -5138,11 +6656,47 @@ class _Harness {
     required this.app,
     required this.controller,
     required this.storage,
+    required this.configStorage,
+    required this.appState,
   });
 
   final Widget app;
   final SessionController controller;
   final AuthStorage storage;
+  final AppConfigStorage configStorage;
+  final ValueNotifier<_HarnessAppState> appState;
+
+  void setConfiguredServer(String? url) {
+    appState.value = _HarnessAppState(
+      hasConfiguredServer: url != null && url.isNotEmpty,
+      isConfigLoading: appState.value.isConfigLoading,
+      currentServerUrl: url,
+      serverUrlErrorMessage: appState.value.serverUrlErrorMessage,
+    );
+  }
+
+  void setHasConfiguredServer(bool value) {
+    appState.value = _HarnessAppState(
+      hasConfiguredServer: value,
+      isConfigLoading: appState.value.isConfigLoading,
+      currentServerUrl: appState.value.currentServerUrl,
+      serverUrlErrorMessage: appState.value.serverUrlErrorMessage,
+    );
+  }
+}
+
+class _HarnessAppState {
+  const _HarnessAppState({
+    required this.hasConfiguredServer,
+    required this.isConfigLoading,
+    required this.currentServerUrl,
+    required this.serverUrlErrorMessage,
+  });
+
+  final bool hasConfiguredServer;
+  final bool isConfigLoading;
+  final String? currentServerUrl;
+  final String? serverUrlErrorMessage;
 }
 
 MaterialApp _testMaterialApp({required Widget home}) {

@@ -18,6 +18,7 @@ class SupplierDto {
       defaultPaymentTypeId: _optionalFk(
             json['default_payment_type'] ??
                 json['default_payment_type_id'] ??
+                json['defaultPaymentType'] ??
                 json['payment_type'],
           ) ??
           _optionalFk(json['payment_type_id']),
