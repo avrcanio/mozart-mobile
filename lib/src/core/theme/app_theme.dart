@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+/// Single visual language on phones: Material 3 / Android-style adaptations
+/// for ink splash, touch targets, and page transitions on both Android and iOS.
 ThemeData buildMozartTheme() {
   const ivory = Color(0xFFF6F0E8);
   const parchment = Color(0xFFE8D8C3);
@@ -8,18 +10,20 @@ ThemeData buildMozartTheme() {
   const brandDark = Color(0xFF7A3E22);
   const accent = Color(0xFF2F6B5F);
 
-  final colorScheme = ColorScheme.fromSeed(
-    seedColor: brand,
-    brightness: Brightness.light,
-  ).copyWith(
-    surface: ivory,
-    primary: brand,
-    secondary: accent,
-    onPrimary: Colors.white,
-    onSurface: ink,
-  );
+  final colorScheme =
+      ColorScheme.fromSeed(
+        seedColor: brand,
+        brightness: Brightness.light,
+      ).copyWith(
+        surface: ivory,
+        primary: brand,
+        secondary: accent,
+        onPrimary: Colors.white,
+        onSurface: ink,
+      );
 
   return ThemeData(
+    platform: TargetPlatform.android,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: ivory,
     useMaterial3: true,
@@ -40,16 +44,8 @@ ThemeData buildMozartTheme() {
         fontWeight: FontWeight.w700,
         color: ink,
       ),
-      bodyLarge: TextStyle(
-        fontSize: 16,
-        height: 1.4,
-        color: ink,
-      ),
-      bodyMedium: TextStyle(
-        fontSize: 14,
-        height: 1.4,
-        color: ink,
-      ),
+      bodyLarge: TextStyle(fontSize: 16, height: 1.4, color: ink),
+      bodyMedium: TextStyle(fontSize: 14, height: 1.4, color: ink),
     ),
     cardTheme: CardThemeData(
       color: Colors.white.withValues(alpha: 0.9),
@@ -79,10 +75,7 @@ ThemeData buildMozartTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.94),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 18,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(20),
         borderSide: BorderSide.none,

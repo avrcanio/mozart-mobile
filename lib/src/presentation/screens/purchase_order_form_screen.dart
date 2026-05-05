@@ -482,163 +482,160 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
         ? 'Uredi narud\u017ebu'
         : 'Nova narud\u017eba';
 
-    return _PurchaseOrderAndroidTheme(
-      child: PopScope(
-        canPop: _isSubmitting || !_hasUnsavedChanges,
-        onPopInvokedWithResult: (didPop, _) async {
-          if (didPop) {
-            return;
-          }
-          await _handlePopAttempt();
-        },
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(title),
-            leading: BackButton(onPressed: _handlePopAttempt),
-          ),
-          floatingActionButton: !_hasValidSupplierSelection
-              ? null
-              : FloatingActionButton.extended(
-                  key: const Key('po-form-add-line'),
-                  onPressed: _isLoading ? null : _openAddLineCatalog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Dodaj stavku'),
-                ),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : Form(
-                      key: _formKey,
-                      child: ListView(
-                        children: [
-                          if (_errorMessage != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: Text(
-                                _errorMessage!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          _SupplierField(
-                            supplierController: _supplierController,
-                            supplierFocusNode: _supplierFocusNode,
-                            suppliers: _suppliers,
-                            selectedSupplierId: _selectedSupplierId,
-                            selectedSupplierName: _selectedSupplierName,
-                            isSubmitting: _isSubmitting,
-                            filterSuppliers: _filterSuppliers,
-                            onTextChanged: _handleSupplierTextChanged,
-                            onSupplierSelected: _handleSupplierSelected,
-                          ),
-                          const SizedBox(height: 14),
-                          DropdownButtonFormField<int>(
-                            key: const Key('po-form-payment-type'),
-                            initialValue: _selectedPaymentTypeId,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Tip pla\u0107anja',
-                            ),
-                            items: _visiblePaymentTypes
-                                .map(
-                                  (paymentType) => DropdownMenuItem<int>(
-                                    value: paymentType.id,
-                                    child: Text(
-                                      paymentType.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: _isSubmitting
-                                ? null
-                                : (value) {
-                                    setState(() {
-                                      _selectedPaymentTypeId = value;
-                                    });
-                                  },
-                            validator: (value) => value == null
-                                ? 'Odaberite tip pla\u0107anja.'
-                                : null,
-                          ),
-                          const SizedBox(height: 14),
-                          TextFormField(
-                            key: const Key('po-form-ordered-at'),
-                            controller: _dateController,
-                            readOnly: true,
-                            enabled: !_isSubmitting && _lines.isEmpty,
-                            decoration: InputDecoration(
-                              labelText: 'Datum narud\u017ebe',
-                              suffixIcon: Icon(
-                                _lines.isEmpty
-                                    ? Icons.calendar_today
-                                    : Icons.lock_outline,
-                              ),
-                              helperText: _lines.isEmpty
-                                  ? null
-                                  : 'Datum je zaklju\u010dan dok narud\u017eba sadr\u017ei stavke.',
-                            ),
-                            onTap: _isSubmitting ? null : _pickDate,
-                            validator: (value) =>
-                                (value == null || value.isEmpty)
-                                ? 'Odaberite datum.'
-                                : null,
-                          ),
-                          const SizedBox(height: 18),
-                          Text(
-                            'Stavke',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 12),
-                          if (_lines.isEmpty)
-                            const Text(
-                              'Dodajte stavke nakon odabira dobavlja\u010da, tipa pla\u0107anja i datuma.',
-                            )
-                          else
-                            ..._lines.asMap().entries.map(
-                              (entry) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _EditableOrderLineCard(
-                                  key: Key('po-line-${entry.key}'),
-                                  lineIndex: entry.key,
-                                  line: entry.value,
-                                  articles: _articles,
-                                  onChanged: (line) {
-                                    setState(() {
-                                      _lines[entry.key] = line;
-                                    });
-                                  },
-                                  onRemove: () {
-                                    setState(() {
-                                      _lines.removeAt(entry.key);
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                          if (_lines.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            _DraftTotalsCard(totals: _draftTotals),
-                          ],
-                          const SizedBox(height: 18),
-                          FilledButton(
-                            key: const Key('po-form-save'),
-                            onPressed: _isSubmitting ? null : _submit,
+    return PopScope(
+      canPop: _isSubmitting || !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) {
+          return;
+        }
+        await _handlePopAttempt();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(title),
+          leading: BackButton(onPressed: _handlePopAttempt),
+        ),
+        floatingActionButton: !_hasValidSupplierSelection
+            ? null
+            : FloatingActionButton.extended(
+                key: const Key('po-form-add-line'),
+                onPressed: _isLoading ? null : _openAddLineCatalog,
+                icon: const Icon(Icons.add),
+                label: const Text('Dodaj stavku'),
+              ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Form(
+                    key: _formKey,
+                    child: ListView(
+                      children: [
+                        if (_errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
                             child: Text(
-                              _isSubmitting
-                                  ? 'Spremanje...'
-                                  : 'Spremi narud\u017ebu',
+                              _errorMessage!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
+                        _SupplierField(
+                          supplierController: _supplierController,
+                          supplierFocusNode: _supplierFocusNode,
+                          suppliers: _suppliers,
+                          selectedSupplierId: _selectedSupplierId,
+                          selectedSupplierName: _selectedSupplierName,
+                          isSubmitting: _isSubmitting,
+                          filterSuppliers: _filterSuppliers,
+                          onTextChanged: _handleSupplierTextChanged,
+                          onSupplierSelected: _handleSupplierSelected,
+                        ),
+                        const SizedBox(height: 14),
+                        DropdownButtonFormField<int>(
+                          key: const Key('po-form-payment-type'),
+                          initialValue: _selectedPaymentTypeId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Tip pla\u0107anja',
+                          ),
+                          items: _visiblePaymentTypes
+                              .map(
+                                (paymentType) => DropdownMenuItem<int>(
+                                  value: paymentType.id,
+                                  child: Text(
+                                    paymentType.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: _isSubmitting
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    _selectedPaymentTypeId = value;
+                                  });
+                                },
+                          validator: (value) => value == null
+                              ? 'Odaberite tip pla\u0107anja.'
+                              : null,
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          key: const Key('po-form-ordered-at'),
+                          controller: _dateController,
+                          readOnly: true,
+                          enabled: !_isSubmitting && _lines.isEmpty,
+                          decoration: InputDecoration(
+                            labelText: 'Datum narud\u017ebe',
+                            suffixIcon: Icon(
+                              _lines.isEmpty
+                                  ? Icons.calendar_today
+                                  : Icons.lock_outline,
+                            ),
+                            helperText: _lines.isEmpty
+                                ? null
+                                : 'Datum je zaklju\u010dan dok narud\u017eba sadr\u017ei stavke.',
+                          ),
+                          onTap: _isSubmitting ? null : _pickDate,
+                          validator: (value) => (value == null || value.isEmpty)
+                              ? 'Odaberite datum.'
+                              : null,
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Stavke',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        if (_lines.isEmpty)
+                          const Text(
+                            'Dodajte stavke nakon odabira dobavlja\u010da, tipa pla\u0107anja i datuma.',
+                          )
+                        else
+                          ..._lines.asMap().entries.map(
+                            (entry) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _EditableOrderLineCard(
+                                key: Key('po-line-${entry.key}'),
+                                lineIndex: entry.key,
+                                line: entry.value,
+                                articles: _articles,
+                                onChanged: (line) {
+                                  setState(() {
+                                    _lines[entry.key] = line;
+                                  });
+                                },
+                                onRemove: () {
+                                  setState(() {
+                                    _lines.removeAt(entry.key);
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                        if (_lines.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          _DraftTotalsCard(totals: _draftTotals),
                         ],
-                      ),
+                        const SizedBox(height: 18),
+                        FilledButton(
+                          key: const Key('po-form-save'),
+                          onPressed: _isSubmitting ? null : _submit,
+                          child: Text(
+                            _isSubmitting
+                                ? 'Spremanje...'
+                                : 'Spremi narud\u017ebu',
+                          ),
+                        ),
+                      ],
                     ),
-            ),
+                  ),
           ),
         ),
       ),
@@ -1098,121 +1095,115 @@ class _PurchaseOrderArticleCatalogScreenState
     final showCategoryJumps = _groups.length > 1;
 
     // ignore: deprecated_member_use
-    return _PurchaseOrderAndroidTheme(
-      child: WillPopScope(
-        onWillPop: () async {
-          _closeCatalog();
-          return false;
-        },
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('Dodaj stavku'),
-            leading: BackButton(
-              key: const Key('po-catalog-back'),
-              onPressed: _closeCatalog,
-            ),
+    return WillPopScope(
+      onWillPop: () async {
+        _closeCatalog();
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Dodaj stavku'),
+          leading: BackButton(
+            key: const Key('po-catalog-back'),
+            onPressed: _closeCatalog,
           ),
-          floatingActionButton: showCategoryJumps
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    FloatingActionButton.small(
-                      key: const Key('po-catalog-prev-group'),
-                      heroTag: 'po-catalog-prev-group',
-                      onPressed: _activeGroupIndex <= 0
-                          ? null
-                          : () => _jumpToGroup(_activeGroupIndex - 1),
-                      child: const Icon(Icons.keyboard_arrow_up),
-                    ),
-                    const SizedBox(height: 10),
-                    FloatingActionButton.small(
-                      key: const Key('po-catalog-next-group'),
-                      heroTag: 'po-catalog-next-group',
-                      onPressed: _activeGroupIndex >= _groups.length - 1
-                          ? null
-                          : () => _jumpToGroup(_activeGroupIndex + 1),
-                      child: const Icon(Icons.keyboard_arrow_down),
-                    ),
-                  ],
+        ),
+        floatingActionButton: showCategoryJumps
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  FloatingActionButton.small(
+                    key: const Key('po-catalog-prev-group'),
+                    heroTag: 'po-catalog-prev-group',
+                    onPressed: _activeGroupIndex <= 0
+                        ? null
+                        : () => _jumpToGroup(_activeGroupIndex - 1),
+                    child: const Icon(Icons.keyboard_arrow_up),
+                  ),
+                  const SizedBox(height: 10),
+                  FloatingActionButton.small(
+                    key: const Key('po-catalog-next-group'),
+                    heroTag: 'po-catalog-next-group',
+                    onPressed: _activeGroupIndex >= _groups.length - 1
+                        ? null
+                        : () => _jumpToGroup(_activeGroupIndex + 1),
+                    child: const Icon(Icons.keyboard_arrow_down),
+                  ),
+                ],
+              )
+            : null,
+        body: SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(_errorMessage!, textAlign: TextAlign.center),
+                  ),
                 )
-              : null,
-          body: SafeArea(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(_errorMessage!, textAlign: TextAlign.center),
+              : _groups.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'Za odabrani datum nema artikala u katalogu dobavlja\u010da.',
+                      textAlign: TextAlign.center,
                     ),
-                  )
-                : _groups.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
+                  ),
+                )
+              : ListView(
+                  key: const Key('po-catalog-list'),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
                       child: Text(
-                        'Za odabrani datum nema artikala u katalogu dobavlja\u010da.',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  )
-                : ListView(
-                    key: const Key('po-catalog-list'),
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Text(
-                          '${widget.supplierName} | ${_formatDateInput(widget.orderedAt)}',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.secondary,
-                                fontWeight: FontWeight.w600,
-                              ),
+                        '${widget.supplierName} | ${_formatDateInput(widget.orderedAt)}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.secondary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      ..._groups.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final group = entry.value;
-                        return Padding(
-                          key: group.key,
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                group.title,
-                                key: Key('po-catalog-group-$index'),
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              ...group.articles.map(
-                                (article) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _ArticleCatalogCard(
-                                    article: article,
-                                    repository: widget.repository,
-                                    orderedQuantity: _orderedQuantityFor(
-                                      article,
-                                    ),
-                                    orderedSummaryLines:
-                                        _orderedSummaryLinesFor(article),
-                                    onTap: () => _selectArticle(article),
+                    ),
+                    ..._groups.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final group = entry.value;
+                      return Padding(
+                        key: group.key,
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              group.title,
+                              key: Key('po-catalog-group-$index'),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            ...group.articles.map(
+                              (article) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _ArticleCatalogCard(
+                                  article: article,
+                                  repository: widget.repository,
+                                  orderedQuantity: _orderedQuantityFor(article),
+                                  orderedSummaryLines: _orderedSummaryLinesFor(
+                                    article,
                                   ),
+                                  onTap: () => _selectArticle(article),
                                 ),
                               ),
-                            ],
-                          ),
-                        );
-                      }),
-                      SizedBox(
-                        height: MediaQuery.sizeOf(context).height * 0.75,
-                      ),
-                    ],
-                  ),
-          ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    SizedBox(height: MediaQuery.sizeOf(context).height * 0.75),
+                  ],
+                ),
         ),
       ),
     );
@@ -1438,88 +1429,82 @@ class _PurchaseOrderArticleQuantityScreenState
       'additionalPackagingLevels=${_additionalPackagingLevels.length}',
     );
 
-    return _PurchaseOrderAndroidTheme(
-      child: Scaffold(
-        appBar: AppBar(title: const Text('Kolicina')),
-        body: SafeArea(
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-              children: [
-                _ArticleCatalogCard(
-                  article: article,
-                  repository: widget.repository,
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  article.name,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                if ((article.packagingPath ?? '').trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    article.packagingPath!.trim(),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
+    return Scaffold(
+      appBar: AppBar(title: const Text('Kolicina')),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            children: [
+              _ArticleCatalogCard(
+                article: article,
+                repository: widget.repository,
+              ),
+              const SizedBox(height: 18),
+              Text(article.name, style: Theme.of(context).textTheme.titleLarge),
+              if ((article.packagingPath ?? '').trim().isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
-                  _currencyFormat.format(article.defaultPrice),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                if (_isLoadingArticleDetail) ...[
-                  const SizedBox(height: 12),
-                  const LinearProgressIndicator(),
-                ],
-                const SizedBox(height: 16),
-                TextFormField(
-                  key: const Key('po-catalog-quantity'),
-                  controller: _quantityController,
-                  decoration: InputDecoration(
-                    labelText: article.unitName.isEmpty
-                        ? 'Kolicina'
-                        : 'Kolicina (${article.unitName})',
-                  ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  validator: (value) {
-                    final parsed = _parseLocalizedDecimal(value ?? '');
-                    if (parsed == null || parsed <= 0) {
-                      return 'Unesite kolicinu.';
-                    }
-                    return null;
-                  },
-                ),
-                if (_additionalPackagingLevels.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  ..._additionalPackagingLevels.map(
-                    (level) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: TextFormField(
-                        key: Key('po-catalog-packaging-${level.storageKey}'),
-                        controller: _packagingControllers[level.storageKey],
-                        decoration: InputDecoration(
-                          labelText: 'Broj pakiranja (${level.displayName})',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        onChanged: (_) =>
-                            _recalculateBaseQuantityFromPackaging(),
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 18),
-                FilledButton(
-                  key: const Key('po-catalog-submit'),
-                  onPressed: _submit,
-                  child: const Text('Dodaj stavku'),
+                  article.packagingPath!.trim(),
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
-            ),
+              const SizedBox(height: 8),
+              Text(
+                _currencyFormat.format(article.defaultPrice),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              if (_isLoadingArticleDetail) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(),
+              ],
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const Key('po-catalog-quantity'),
+                controller: _quantityController,
+                decoration: InputDecoration(
+                  labelText: article.unitName.isEmpty
+                      ? 'Kolicina'
+                      : 'Kolicina (${article.unitName})',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (value) {
+                  final parsed = _parseLocalizedDecimal(value ?? '');
+                  if (parsed == null || parsed <= 0) {
+                    return 'Unesite kolicinu.';
+                  }
+                  return null;
+                },
+              ),
+              if (_additionalPackagingLevels.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ..._additionalPackagingLevels.map(
+                  (level) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: TextFormField(
+                      key: Key('po-catalog-packaging-${level.storageKey}'),
+                      controller: _packagingControllers[level.storageKey],
+                      decoration: InputDecoration(
+                        labelText: 'Broj pakiranja (${level.displayName})',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      onChanged: (_) => _recalculateBaseQuantityFromPackaging(),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              FilledButton(
+                key: const Key('po-catalog-submit'),
+                onPressed: _submit,
+                child: const Text('Dodaj stavku'),
+              ),
+            ],
           ),
         ),
       ),
@@ -2458,20 +2443,6 @@ int _mapHash<K, V>(Map<K, V> map) {
 
 String _normalizeSupplierName(String value) {
   return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-}
-
-class _PurchaseOrderAndroidTheme extends StatelessWidget {
-  const _PurchaseOrderAndroidTheme({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(platform: TargetPlatform.android),
-      child: child,
-    );
-  }
 }
 
 String _resolveArticleGroupTitle(SupplierArticleDto article) {
