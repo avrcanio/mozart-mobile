@@ -1,10 +1,10 @@
-# Ordino
+# FS Ordino
 
 <p align="center">
-  <img src="assets/branding/app_mark.png" alt="Ordino app mark" width="180">
+  <img src="assets/branding/app_mark.png" alt="FS Ordino app mark" width="180">
 </p>
 
-Mobile purchase, mailbox, and dashboard client for the Mozart backend, now branded as `Ordino`.
+Mobile purchase, mailbox, and dashboard client for the Mozart backend, branded as **FS Ordino** (package name `ordino`).
 
 ## Overview
 

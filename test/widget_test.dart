@@ -41,7 +41,7 @@ void main() {
     await tester.pumpWidget(harness.app);
     await tester.pump();
 
-    expect(find.text('Ordino'), findsOneWidget);
+    expect(find.text('FS Ordino'), findsOneWidget);
     expect(find.text('Prijava'), findsOneWidget);
   });
 
@@ -222,7 +222,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Ordino'), findsNothing);
+    expect(find.text('FS Ordino'), findsNothing);
     expect(
       find.text('Pregled najvaznijih obaveza i stanja za danasnji rad.'),
       findsNothing,

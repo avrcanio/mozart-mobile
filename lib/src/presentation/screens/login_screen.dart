@@ -79,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     const SizedBox(width: 14),
                                     Expanded(
                                       child: Text(
-                                        'Ordino',
+                                        'FS Ordino',
                                         style: theme.textTheme.displaySmall,
                                       ),
                                     ),

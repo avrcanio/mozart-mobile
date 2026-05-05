@@ -160,6 +160,7 @@ class _MozartMobileAppState extends State<MozartMobileApp> {
   Widget build(BuildContext context) {
     if (_isBootstrapping || _services == null || _sessionController == null) {
       return MaterialApp(
+        title: 'FS Ordino',
         theme: buildMozartTheme(),
         debugShowCheckedModeBanner: false,
         locale: const Locale('hr', 'HR'),
@@ -181,7 +182,7 @@ class _MozartMobileAppState extends State<MozartMobileApp> {
       child: SessionScope(
         controller: _sessionController!,
         child: MaterialApp(
-          title: 'Ordino',
+          title: 'FS Ordino',
           theme: buildMozartTheme(),
           debugShowCheckedModeBanner: false,
           locale: const Locale('hr', 'HR'),
