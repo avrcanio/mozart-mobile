@@ -245,6 +245,13 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     _selectedSupplierName = resolvedSupplier.name;
   }
 
+  void _applyDefaultPaymentTypeForSupplier(SupplierDto supplier) {
+    final id = supplier.defaultPaymentTypeId;
+    if (id != null && id > 0) {
+      _selectedPaymentTypeId = id;
+    }
+  }
+
   void _handleSupplierTextChanged(FormFieldState<int> field, String value) {
     final resolvedSupplier = _findSupplierByName(_suppliers, value);
     if (resolvedSupplier != null) {
@@ -255,6 +262,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
         setState(() {
           _selectedSupplierId = resolvedSupplier.id;
           _selectedSupplierName = resolvedSupplier.name;
+          _applyDefaultPaymentTypeForSupplier(resolvedSupplier);
         });
       }
       field.didChange(resolvedSupplier.id);
@@ -278,6 +286,7 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
     setState(() {
       _selectedSupplierId = supplier.id;
       _selectedSupplierName = supplier.name;
+      _applyDefaultPaymentTypeForSupplier(supplier);
       _supplierController.value = TextEditingValue(
         text: supplier.name,
         selection: TextSelection.collapsed(offset: supplier.name.length),
@@ -557,34 +566,39 @@ class _PurchaseOrderFormScreenState extends State<PurchaseOrderFormScreen> {
                         },
                       ),
                       const SizedBox(height: 14),
-                      DropdownButtonFormField<int>(
+                      KeyedSubtree(
                         key: const Key('po-form-payment-type'),
-                        initialValue: _selectedPaymentTypeId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Tip pla\u0107anja',
-                        ),
-                        items: _visiblePaymentTypes
-                            .map(
-                              (paymentType) => DropdownMenuItem<int>(
-                                value: paymentType.id,
-                                child: Text(
-                                  paymentType.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                        child: DropdownButtonFormField<int>(
+                          key: ValueKey<String>(
+                            'po-payment-${_selectedSupplierId}_$_selectedPaymentTypeId',
+                          ),
+                          initialValue: _selectedPaymentTypeId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Tip pla\u0107anja',
+                          ),
+                          items: _visiblePaymentTypes
+                              .map(
+                                (paymentType) => DropdownMenuItem<int>(
+                                  value: paymentType.id,
+                                  child: Text(
+                                    paymentType.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _isSubmitting
-                            ? null
-                            : (value) {
-                                setState(() {
-                                  _selectedPaymentTypeId = value;
-                                });
-                              },
-                        validator: (value) =>
-                            value == null ? 'Odaberite tip pla\u0107anja.' : null,
+                              )
+                              .toList(),
+                          onChanged: _isSubmitting
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    _selectedPaymentTypeId = value;
+                                  });
+                                },
+                          validator: (value) =>
+                              value == null ? 'Odaberite tip pla\u0107anja.' : null,
+                        ),
                       ),
                       const SizedBox(height: 14),
                       TextFormField(

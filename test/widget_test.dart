@@ -1447,6 +1447,66 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     },
   );
 
+  testWidgets('applies supplier default payment type when supplier is selected', (
+    tester,
+  ) async {
+    final repository = PurchaseOrderRepository(
+      apiClient: ApiClient(
+        baseUrl: 'https://example.test',
+        transport: _FakeTransport(<String, dynamic>{
+          'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{
+              'id': 2,
+              'name': 'Koktel Ugostiteljstvo d.o.o.',
+              'default_payment_type': 6,
+            },
+          ]),
+          'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
+            <String, dynamic>{'id': 5, 'name': 'Virman'},
+            <String, dynamic>{'id': 6, 'name': 'Gotovina'},
+          ]),
+          'GET /api/suppliers/2/artikli/': _jsonListResponse(
+            <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 77,
+                'artikl_name': 'Coffee beans',
+                'unit_of_measure': 1,
+                'unit_name': 'kg',
+                'price': '12.50',
+              },
+            ],
+          ),
+        }),
+      ),
+    );
+
+    await tester.pumpWidget(
+      _testMaterialApp(
+        home: PurchaseOrderFormScreen(
+          session: const UserSession(
+            token: 'token',
+            username: 'root',
+            fullName: 'Root User',
+            email: 'root@mozart.local',
+          ),
+          repository: repository,
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('po-form-supplier')),
+      'Koktel',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Koktel Ugostiteljstvo d.o.o.').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gotovina'), findsWidgets);
+  });
+
   testWidgets('renders purchase order detail summary and line items', (
     tester,
   ) async {
@@ -4909,7 +4969,11 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
         baseUrl: 'https://example.test',
         transport: _FakeTransport(<String, dynamic>{
           'GET /api/suppliers/': _jsonListResponse(<Map<String, dynamic>>[
-            <String, dynamic>{'id': 2, 'name': 'Blue Harbor Supply'},
+            <String, dynamic>{
+              'id': 2,
+              'name': 'Blue Harbor Supply',
+              'default_payment_type': 5,
+            },
           ]),
           'GET /api/payment-types/': _jsonListResponse(<Map<String, dynamic>>[
             <String, dynamic>{'id': 5, 'name': 'Virman'},
@@ -4978,11 +5042,6 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Blue Harbor Supply').last);
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('po-form-payment-type')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Virman').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Dodaj stavku'));
