@@ -52,3 +52,18 @@ Implemented <short description>.
   - no escaped newlines
   - no broken Unicode/control characters
   - no accidental one-line paragraph dumps
+
+## App Store Connect (TestFlight Upload)
+
+- App Store Connect API key file is stored locally (do not commit): `~/.private_keys/AuthKey_3DFVS3AZCM.p8`
+- Issuer ID: `46ffd31e-7b4f-4b55-ad86-647eff2e672e`
+- Key ID: `3DFVS3AZCM`
+- Upload IPA with API key (requires Issuer ID from App Store Connect):
+
+```bash
+cd /Volumes/External-home/Projects/mozart-mobile
+xcrun altool --upload-app --type ios \
+  -f "build/ios/ipa/Ordino.ipa" \
+  --apiKey "3DFVS3AZCM" \
+  --apiIssuer "46ffd31e-7b4f-4b55-ad86-647eff2e672e"
+```
