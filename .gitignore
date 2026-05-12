@@ -48,3 +48,8 @@ app.*.map.json
 /android/*.keystore
 /android/app/*.jks
 /android/app/*.keystore
+
+# Local env (Play / secrets)
+.env
+.env.playstore
+.env.local
