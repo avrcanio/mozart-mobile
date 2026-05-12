@@ -392,9 +392,6 @@ class _ReceiptLineCard extends StatelessWidget {
                 if (parsed < 0) {
                   return 'Kolicina ne moze biti negativna.';
                 }
-                if (parsed > line.remainingQuantity) {
-                  return 'Kolicina ne moze biti veca od preostale.';
-                }
                 return null;
               },
             ),
