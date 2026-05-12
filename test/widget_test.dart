@@ -26,6 +26,13 @@ import 'package:ordino/src/presentation/session_scope.dart';
 import 'package:ordino/src/presentation/screens/purchase_order_receipt_screen.dart';
 import 'package:ordino/src/presentation/screens/purchase_order_form_screen.dart';
 
+String _fakeSupplierArtikliOrderedAtKey(int supplierId) {
+  final local = DateTime.now().toLocal();
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  return 'GET /api/suppliers/$supplierId/artikli/?ordered_at=${local.year}-$month-$day';
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -2340,7 +2347,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             },
           ],
         ),
-        'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+        _fakeSupplierArtikliOrderedAtKey(2):
             _jsonListResponse(<Map<String, dynamic>>[
               <String, dynamic>{
                 'id': 77,
@@ -2900,7 +2907,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
               },
             ],
           ),
-          'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+          _fakeSupplierArtikliOrderedAtKey(2):
               _jsonListResponse(<Map<String, dynamic>>[
                 <String, dynamic>{
                   'id': 77,
@@ -6521,7 +6528,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'GET /api/suppliers/2/artikli/': _jsonListResponse(
               <Map<String, dynamic>>[],
             ),
-            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+            _fakeSupplierArtikliOrderedAtKey(2):
                 _jsonListResponse(<Map<String, dynamic>>[
                   <String, dynamic>{
                     'id': 76,
@@ -6719,7 +6726,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
           'GET /api/suppliers/2/artikli/': _jsonListResponse(
             <Map<String, dynamic>>[],
           ),
-          'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+          _fakeSupplierArtikliOrderedAtKey(2):
               _jsonListResponse(<Map<String, dynamic>>[
                 <String, dynamic>{
                   'id': 77,
@@ -6872,7 +6879,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'GET /api/suppliers/3/artikli/': _jsonListResponse(
               <Map<String, dynamic>>[],
             ),
-            'GET /api/suppliers/3/artikli/?ordered_at=2026-04-15':
+            _fakeSupplierArtikliOrderedAtKey(3):
                 _jsonListResponse(categoryPayload),
           }),
         ),
@@ -6963,7 +6970,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
               },
             ],
           ),
-          'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+          _fakeSupplierArtikliOrderedAtKey(2):
               _jsonListResponse(<Map<String, dynamic>>[
                 <String, dynamic>{
                   'id': 77,
@@ -7045,7 +7052,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'GET /api/suppliers/2/artikli/': _jsonListResponse(
               <Map<String, dynamic>>[],
             ),
-            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+            _fakeSupplierArtikliOrderedAtKey(2):
                 _jsonListResponse(<Map<String, dynamic>>[
                   <String, dynamic>{
                     'id': 77,
@@ -7190,7 +7197,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'GET /api/suppliers/2/artikli/': _jsonListResponse(
               <Map<String, dynamic>>[],
             ),
-            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+            _fakeSupplierArtikliOrderedAtKey(2):
                 _jsonListResponse(<Map<String, dynamic>>[
                   <String, dynamic>{
                     'id': 77,
@@ -7381,7 +7388,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'GET /api/suppliers/2/artikli/': _jsonListResponse(
               <Map<String, dynamic>>[],
             ),
-            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+            _fakeSupplierArtikliOrderedAtKey(2):
                 _jsonListResponse(<Map<String, dynamic>>[
                   <String, dynamic>{
                     'id': 171,
@@ -7492,7 +7499,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'GET /api/suppliers/2/artikli/': _jsonListResponse(
               <Map<String, dynamic>>[],
             ),
-            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+            _fakeSupplierArtikliOrderedAtKey(2):
                 _jsonListResponse(<Map<String, dynamic>>[
                   <String, dynamic>{
                     'id': 171,
@@ -7594,7 +7601,7 @@ Molimo potvrdite primitak narudžbe klikom na sljedeći link: https://mozart.sib
             'GET /api/suppliers/2/artikli/': _jsonListResponse(
               <Map<String, dynamic>>[],
             ),
-            'GET /api/suppliers/2/artikli/?ordered_at=2026-04-15':
+            _fakeSupplierArtikliOrderedAtKey(2):
                 _jsonListResponse(<Map<String, dynamic>>[
                   <String, dynamic>{
                     'id': 171,

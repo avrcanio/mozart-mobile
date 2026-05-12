@@ -2,35 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../app_config/app_config_storage.dart';
+
 typedef JsonMap = Map<String, dynamic>;
-
-String normalizeApiBaseUrl(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) {
-    throw const FormatException('URL servisa je obavezan.');
-  }
-
-  final normalized = trimmed.replaceAll(RegExp(r'/+$'), '');
-  final uri = Uri.tryParse(normalized);
-  if (uri == null ||
-      !(uri.scheme == 'http' || uri.scheme == 'https') ||
-      uri.host.trim().isEmpty) {
-    throw const FormatException('URL servisa nije ispravan.');
-  }
-
-  return normalized;
-}
-
-String resolveApiBaseUrl(
-  String? savedBaseUrl, {
-  required String fallbackUrl,
-}) {
-  final candidate = savedBaseUrl?.trim() ?? '';
-  if (candidate.isEmpty) {
-    return fallbackUrl;
-  }
-  return candidate;
-}
 
 class ApiClient {
   ApiClient({
@@ -52,16 +26,6 @@ class ApiClient {
   void setBaseUrl(String value) {
     final trimmed = value.trim();
     _baseUrl = trimmed.isEmpty ? '' : normalizeApiBaseUrl(trimmed);
-  }
-
-  Future<void> probeReachability() async {
-    try {
-      await getJson('/api/me/');
-    } on ApiException catch (error) {
-      if (error.isConnectivityIssue) {
-        rethrow;
-      }
-    }
   }
 
   Future<JsonMap> getJson(
