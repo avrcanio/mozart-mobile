@@ -16,6 +16,31 @@ class AuthRepository {
   final AuthStorage _storage;
   final String? logoutPath;
 
+  String get currentBaseUrl => _apiClient.baseUrl;
+
+  void configureBaseUrl(String baseUrl) {
+    _apiClient.setBaseUrl(baseUrl);
+  }
+
+  Future<String?> readStoredBaseUrl() {
+    return _storage.readBaseUrl();
+  }
+
+  Future<void> saveBaseUrl(String baseUrl) async {
+    try {
+      final normalizedBaseUrl = normalizeApiBaseUrl(baseUrl);
+      configureBaseUrl(normalizedBaseUrl);
+      await _storage.saveBaseUrl(normalizedBaseUrl);
+    } on FormatException catch (error) {
+      throw AuthException(error.message);
+    }
+  }
+
+  Future<void> clearBaseUrl() async {
+    _apiClient.setBaseUrl('');
+    await _storage.saveBaseUrl('');
+  }
+
   Uri get tokenEndpoint => _apiClient.endpoint(path: '/api/token/');
 
   Uri get meEndpoint => _apiClient.endpoint(path: '/api/me/');
@@ -26,6 +51,9 @@ class AuthRepository {
   }) async {
     final normalizedUsername = username.trim();
     final normalizedPassword = password.trim();
+    if (_apiClient.baseUrl.trim().isEmpty) {
+      throw const AuthException('URL servisa je obavezan.');
+    }
     if (normalizedUsername.isEmpty || normalizedPassword.isEmpty) {
       throw const AuthException('Korisničko ime i lozinka su obavezni.');
     }

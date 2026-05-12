@@ -8,6 +8,10 @@ abstract class AuthStorage {
   Future<String?> readToken();
 
   Future<void> clearToken();
+
+  Future<void> saveBaseUrl(String baseUrl);
+
+  Future<String?> readBaseUrl();
 }
 
 abstract class SecureKeyValueStore {
@@ -82,6 +86,7 @@ class SecureAuthStorage implements AuthStorage {
        _fallbackStore = fallbackStore ?? const SharedPreferencesKeyValueStore();
 
   static const String tokenKey = 'mozart_auth_token';
+  static const String baseUrlKey = 'mozart_api_base_url';
 
   final SecureKeyValueStore _store;
   final PlainKeyValueStore _fallbackStore;
@@ -110,6 +115,25 @@ class SecureAuthStorage implements AuthStorage {
     }
   }
 
+  @override
+  Future<String?> readBaseUrl() async {
+    try {
+      return await _store.read(key: baseUrlKey);
+    } on PlatformException {
+      return _fallbackStore.read(key: baseUrlKey);
+    }
+  }
+
+  @override
+  Future<void> saveBaseUrl(String baseUrl) async {
+    try {
+      await _store.write(key: baseUrlKey, value: baseUrl);
+      await _fallbackStore.delete(key: baseUrlKey);
+    } on PlatformException {
+      await _fallbackStore.write(key: baseUrlKey, value: baseUrl);
+    }
+  }
+
   Future<void> _deleteFromAllStores({required String key}) async {
     try {
       await _store.delete(key: key);
@@ -122,6 +146,7 @@ class SecureAuthStorage implements AuthStorage {
 
 class InMemoryAuthStorage implements AuthStorage {
   String? _token;
+  String? _baseUrl;
 
   @override
   Future<void> clearToken() async {
@@ -130,6 +155,14 @@ class InMemoryAuthStorage implements AuthStorage {
 
   @override
   Future<String?> readToken() async => _token;
+
+  @override
+  Future<String?> readBaseUrl() async => _baseUrl;
+
+  @override
+  Future<void> saveBaseUrl(String baseUrl) async {
+    _baseUrl = baseUrl;
+  }
 
   @override
   Future<void> saveToken(String token) async {
