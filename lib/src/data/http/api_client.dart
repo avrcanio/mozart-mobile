@@ -205,8 +205,8 @@ class ApiClient {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     final uri = Uri.parse('$normalizedBase$normalizedPath');
     final allEntries = <MapEntry<String, String>>[
-      if (queryParametersList != null) ...queryParametersList,
-      if (queryParameters != null) ...queryParameters.entries,
+      ...?queryParametersList,
+      ...?queryParameters?.entries,
     ];
     if (allEntries.isEmpty) {
       return uri;

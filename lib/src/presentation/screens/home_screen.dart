@@ -1210,25 +1210,27 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 16),
-              Container(
+              Material(
                 key: const Key('po-filter-status'),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
+                color: Theme.of(context).colorScheme.surface,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
+                  side: BorderSide(
                     color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
                   ),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: Text('Statusi'),
-                    ),
-                    ..._purchaseOrderStatusOptions.map(
-                      (option) => CheckboxListTile(
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        child: Text('Statusi'),
+                      ),
+                      ..._purchaseOrderStatusOptions.map(
+                        (option) => CheckboxListTile(
                         key: Key('po-filter-status-${option.value}'),
                         value: _statuses.contains(option.value),
                         title: Text(option.label),
@@ -1252,6 +1254,7 @@ class _PurchaseOrderFilterSheetState extends State<_PurchaseOrderFilterSheet> {
                   ],
                 ),
               ),
+            ),
               const SizedBox(height: 14),
               DropdownButtonFormField<int?>(
                 key: const Key('po-filter-supplier'),
