@@ -48,6 +48,8 @@ app.*.map.json
 /android/*.keystore
 /android/app/*.jks
 /android/app/*.keystore
+# Play Console package-name verification token (account-specific)
+/android/app/src/main/assets/adi-registration.properties
 
 # Local env (Play / secrets)
 .env
