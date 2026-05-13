@@ -78,3 +78,21 @@ Prema `purchase_order_id` otvori detalj narudžbe u aplikaciji.
 
 - Iz kontejnera `mozzart` (s ispravnim tokenom): `curl -X POST http://gcloud-api:8080/fcm/send` s `topic`, `project_alias`, `notification` i `data` (vidi `/opt/stacks/gcloud/README.md`).
 - Na fizičkom iPhoneu: development certifikat / sandbox APNs preko Firebase-a.
+
+## USB uređaj: instalacija i logovi
+
+```bash
+cd /path/to/mozart-mobile
+flutter devices   # kopiraj ID fizičkog iPhonea (ne simulatora)
+IOS_DEVICE_ID=<id> ./scripts/ios_install_logs.sh
+```
+
+U streamu traži `purchase_order_fcm` (npr. `authorizationStatus`, `APNs token received`, `subscribed topic`).
+
+## Ako i dalje „ne radi“
+
+1. U **Postavkama iPhonea** → FS Ordino → **Obavijesti** moraju biti uključene (Barem „Dopušteno“ / „Trenutne“).
+2. Moraš biti **prijavljen** u app (pretplata na topic ide nakon sessiona).
+3. **Xcode** → Window → Devices and Simulators → iPhone → **Open Console** ako `flutter logs` ne pokaže dovoljno native poruka.
+4. **TestFlight (production APNs)** vs **USB debug (development APNs)** — oba rade s istim APNs .p8 u Firebaseu; distinkcija je u buildu i entitlementsima, ne u konzoli ključa.
+5. Na telefonu: **Postavke → Općenito → VPN i upravljanje uređajem** — profil developera mora biti povjeren ako je prvi sideload.
