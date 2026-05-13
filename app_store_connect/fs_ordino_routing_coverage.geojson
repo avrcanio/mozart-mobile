@@ -1,0 +1,26 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "FS Ordino — pokrivenost (Hrvatska, pojednostavljeni obris)",
+        "description": "Gruba pravokutna regija oko Hrvatske za Routing App Coverage. Za točan oblik koristi službene granice u GIS alatu."
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [13.2, 42.2],
+              [19.6, 42.2],
+              [19.6, 46.65],
+              [13.2, 46.65],
+              [13.2, 42.2]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

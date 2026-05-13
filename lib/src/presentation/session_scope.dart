@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/auth/auth_repository.dart';
 import '../domain/user_session.dart';
+import '../push/purchase_order_fcm.dart';
 
 class SessionState {
   const SessionState({
@@ -65,6 +68,9 @@ class SessionController extends ValueNotifier<SessionState> {
         apiBaseUrl: resolvedBaseUrl,
         clearSession: session == null,
       );
+      if (session != null) {
+        unawaited(subscribeMozzartPurchaseOrdersTopic());
+      }
     } catch (error) {
       value = value.copyWith(
         isLoading: false,
@@ -89,6 +95,7 @@ class SessionController extends ValueNotifier<SessionState> {
         session: session,
         clearError: true,
       );
+      unawaited(subscribeMozzartPurchaseOrdersTopic());
     } on AuthException catch (error) {
       value = value.copyWith(
         isLoading: false,
