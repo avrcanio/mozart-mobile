@@ -55,3 +55,6 @@ app.*.map.json
 .env
 .env.playstore
 .env.local
+
+# Xcode — SwiftPM resolution under workspace (local, not shared across machines)
+ios/**/xcshareddata/swiftpm/
