@@ -149,6 +149,7 @@ class SessionController extends ValueNotifier<SessionState> {
   }
 
   Future<void> logout() async {
+    unawaited(unsubscribeMozzartPurchaseOrdersTopic());
     await _authRepository.logout(authToken: value.session?.token);
     value = value.copyWith(
       isLoading: false,

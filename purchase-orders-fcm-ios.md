@@ -28,6 +28,28 @@ Backend šalje **topic** poruke na FCM topic iz konfiguracije (zadano `mozzart_p
    - **Foreground**: `MessagingDelegate` → `messaging(_:didReceiveMessage:)`.
    - **Background / tap**: `userNotificationCenter(_:didReceive:withCompletionHandler:)` i UNNotificationResponse.
 
+## FS Ordino (Flutter app u ovom repou)
+
+Ovo pokriva isti checklist kao Swift sažetak iznad, preko **FlutterFire** (`firebase_core`, `firebase_messaging`):
+
+| Zahtjev (iz checklista) | U implementaciji |
+|-------------------------|------------------|
+| Firebase + Messaging | `pubspec.yaml`, `Firebase.initializeApp()` u `lib/main.dart` |
+| `GoogleService-Info.plist` u bundleu | `ios/Runner/GoogleService-Info.plist` + uključen u Xcode **Copy Bundle Resources** |
+| APNs u Firebase konzoli | Ručno u projektu (nije u kodu); bez .p8 u konzoli iOS **ne** prima FCM |
+| Pretplata na topic nakon auth | `subscribeMozzartPurchaseOrdersTopic()` iz `session_scope.dart` nakon login/restore |
+| Točan topic | `kMozzartPurchaseOrdersFcmTopic` u `lib/src/push/purchase_order_fcm.dart` = `mozzart_purchase_orders` (kao `MOZZART_FCM_TOPIC`) |
+| Foreground prikaz | `setForegroundNotificationPresentationOptions` u `main.dart` |
+| Push capability / APNs entitlement | `ios/Runner/DebugProfile.entitlements` (`development`), `Release.entitlements` (`production`) |
+| Background remote | `UIBackgroundModes` → `remote-notification` u `Info.plist` |
+| Method swizzling (FCM plugin) | `FirebaseAppDelegateProxyEnabled` = true u `Info.plist` |
+| iOS: APNs token kasni | Prije `subscribeToTopic` čeka se `getAPNSToken()` (do ~10 s); zatim `getToken()` |
+| Osvježenje FCM tokena | `installMozzartFcmTokenRefreshHandler()` u `main.dart` — ponovna pretplata ako je korisnik već uspješno pretplaćen |
+| Odjava | `unsubscribeMozzartPurchaseOrdersTopic()` pri logoutu |
+| Background handler (data / terminated) | `firebaseMessagingBackgroundHandler` u `lib/src/push/firebase_background.dart`, registriran u `main.dart` |
+
+**Debug:** na fizičkom iPhoneu (ne simulator) u Xcode konzoli filtriraj `purchase_order_fcm` — trebaju se pojaviti poruke poput `getToken ok`, `subscribed topic`, ili upozorenja ako je APNs token null / dozvola odbijena.
+
 ## Payload koji šalje backend
 
 `notification.title` / `notification.body` (prikaz u trayu), plus `data` (sve vrijednosti su stringovi):
